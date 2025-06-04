@@ -1,0 +1,245 @@
+.savings-plan-container {
+  background-color: #ffffff;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  max-width: 600px;
+  margin: 20px auto;
+}
+
+.savings-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.savings-header h3 {
+  color: #333;
+  font-size: 20px;
+  margin: 0;
+}
+
+.tea-badge {
+  background-color: #1e3a8a;
+  color: white;
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.savings-info {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.savings-subtitle {
+  color: #666;
+  font-size: 16px;
+  margin: 0;
+}
+
+.savings-subtitle strong {
+  color: #333;
+  font-weight: 600;
+}
+
+.amount-display {
+  background-color: #f8f9fa;
+  padding: 16px;
+  border-radius: 8px;
+  margin-bottom: 24px;
+}
+
+.amount-label {
+  color: #666;
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.amount-value {
+  color: #333;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.plan-selector {
+  margin-bottom: 24px;
+}
+
+.selector-label {
+  color: #666;
+  font-size: 16px;
+  margin-bottom: 16px;
+}
+
+.plan-options {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.plan-option {
+  flex: 1;
+  padding: 16px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.plan-option:hover {
+  border-color: #1e3a8a;
+  background-color: rgba(30, 58, 138, 0.05);
+}
+
+.plan-option.selected {
+  border-color: #1e3a8a;
+  background-color: rgba(30, 58, 138, 0.1);
+}
+
+.plan-days {
+  color: #333;
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.plan-months {
+  color: #666;
+  font-size: 14px;
+}
+
+.savings-result {
+  margin-bottom: 20px;
+}
+
+.result-card {
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  padding: 20px;
+  border: 2px solid transparent;
+  transition: all 0.3s ease;
+}
+
+.result-card.selected {
+  border-color: #1e3a8a;
+  background-color: #ffffff;
+  box-shadow: 0 4px 12px rgba(30, 58, 138, 0.15);
+}
+
+.result-header {
+  margin-bottom: 16px;
+}
+
+.tea-indicator {
+  display: inline-block;
+  background-color: #1e3a8a;
+  color: white;
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.result-details {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.detail-row.highlight {
+  background-color: rgba(30, 58, 138, 0.05);
+  padding: 12px;
+  margin: 0 -12px;
+  border-radius: 4px;
+  border-bottom: none;
+}
+
+.detail-row.total {
+  border-bottom: none;
+  padding-top: 12px;
+  font-weight: 600;
+}
+
+.detail-label {
+  color: #666;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.detail-value {
+  color: #333;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.detail-value.interest {
+  color: #1e3a8a;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.view-more-btn {
+  width: 100%;
+  padding: 12px;
+  background-color: transparent;
+  border: 1px solid #1e3a8a;
+  color: #1e3a8a;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.view-more-btn:hover {
+  background-color: #1e3a8a;
+  color: white;
+}
+
+.additional-info {
+  margin-top: 20px;
+  padding: 16px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+}
+
+.info-text {
+  color: #666;
+  font-size: 14px;
+  line-height: 1.6;
+  margin: 8px 0;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .savings-plan-container {
+    padding: 16px;
+  }
+  
+  .plan-options {
+    flex-direction: column;
+  }
+  
+  .plan-option {
+    width: 100%;
+  }
+  
+  .savings-header {
+    flex-direction: column;
+    gap: 12px;
+    text-align: center;
+  }
+}
