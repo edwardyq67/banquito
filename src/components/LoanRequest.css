@@ -773,6 +773,40 @@
   transform: translateY(0);
 }
 
+/* Modal Simple */
+.simple-modal {
+  background: white;
+  border-radius: 15px;
+  padding: 30px;
+  text-align: center;
+  min-width: 300px;
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.2);
+  animation: slideUp 0.3s ease;
+}
+
+.simple-modal h3 {
+  margin: 0 0 20px 0;
+  font-size: 1.3rem;
+  color: #333;
+  font-weight: 600;
+}
+
+.modal-ok-btn {
+  background: #3b82f6;
+  color: white;
+  border: none;
+  padding: 12px 30px;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.modal-ok-btn:hover {
+  background: #2563eb;
+}
+
 /* Responsive para el modal */
 @media (max-width: 768px) {
   .success-modal {

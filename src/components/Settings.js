@@ -214,7 +214,7 @@ const Settings = ({ settings, setSettings, loans = [] }) => {
         <div className="rate-setting-item delinquency">
           <div className="rate-header">
             <span className="rate-label">💸 Tasa de Recargo por Mora</span>
-            <span className="rate-description">Porcentaje único aplicado sobre el pago vencido</span>
+            <span className="rate-description">Porcentaje aplicado diariamente sobre el pago vencido</span>
           </div>
           <div className="rate-input">
             <input
@@ -225,7 +225,7 @@ const Settings = ({ settings, setSettings, loans = [] }) => {
               max="50"
               step="0.5"
             />
-            <span className="rate-unit">% único</span>
+            <span className="rate-unit">% diario</span>
           </div>
         </div>
 
@@ -249,15 +249,15 @@ const Settings = ({ settings, setSettings, loans = [] }) => {
               </div>
               <div className="calc-row">
                 <span>Días de retraso:</span>
-                <span>5 días (no afecta el cálculo)</span>
+                <span>5 días</span>
               </div>
               <div className="calc-row highlight">
-                <span>Recargo por mora (único):</span>
-                <span>S/ {Math.ceil(250 * (tempSettings.delinquencyRate / 100))}</span>
+                <span>Recargo por mora ({tempSettings.delinquencyRate}% × 5 días):</span>
+                <span>S/ {Math.ceil(250 * (tempSettings.delinquencyRate / 100) * 5)}</span>
               </div>
               <div className="calc-row total">
                 <span><strong>Total a pagar:</strong></span>
-                <span><strong>S/ {Math.ceil(250 + (250 * (tempSettings.delinquencyRate / 100)))}</strong></span>
+                <span><strong>S/ {Math.ceil(250 + (250 * (tempSettings.delinquencyRate / 100) * 5))}</strong></span>
               </div>
             </div>
           </div>

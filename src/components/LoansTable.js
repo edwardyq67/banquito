@@ -26,6 +26,16 @@ const LoansTable = ({ loans, setLoans, members, userRole, calculateLateFee, getP
   }, [loans]);
 
   const getStatusInfo = (loan) => {
+    // Manejar estados de solicitudes primero
+    if (loan.status === 'Por aprobar') {
+      return { label: 'Por aprobar', class: 'pending-approval', icon: '⏳' };
+    } else if (loan.status === 'Aprobada') {
+      return { label: 'Aprobada', class: 'approved', icon: '✅' };
+    } else if (loan.status === 'Rechazada') {
+      return { label: 'Rechazada', class: 'rejected', icon: '❌' };
+    }
+
+    // Estados normales de préstamos
     const today = new Date();
     const dueDate = new Date(loan.dueDate);
     const daysDiff = Math.floor((dueDate - today) / (1000 * 60 * 60 * 24));
@@ -53,6 +63,9 @@ const LoansTable = ({ loans, setLoans, members, userRole, calculateLateFee, getP
         if (statusFilter === 'current' && statusInfo.class !== 'current') matchesStatus = false;
         if (statusFilter === 'paid' && statusInfo.class !== 'paid') matchesStatus = false;
         if (statusFilter === 'due-soon' && statusInfo.class !== 'due-soon') matchesStatus = false;
+        if (statusFilter === 'pending-approval' && statusInfo.class !== 'pending-approval') matchesStatus = false;
+        if (statusFilter === 'approved' && statusInfo.class !== 'approved') matchesStatus = false;
+        if (statusFilter === 'rejected' && statusInfo.class !== 'rejected') matchesStatus = false;
       }
       
       return matchesSearch && matchesStatus;
@@ -164,6 +177,9 @@ const LoansTable = ({ loans, setLoans, members, userRole, calculateLateFee, getP
             className="status-filter"
           >
             <option value="all">Todos los estados</option>
+            <option value="pending-approval">Por aprobar</option>
+            <option value="approved">Aprobada</option>
+            <option value="rejected">Rechazada</option>
             <option value="current">Al día</option>
             <option value="due-soon">Por vencer</option>
             <option value="overdue">Vencidos</option>
@@ -197,7 +213,7 @@ const LoansTable = ({ loans, setLoans, members, userRole, calculateLateFee, getP
                 Fecha Vencimiento {getSortIcon('dueDate')}
               </th>
               <th>Estado</th>
-              <th>Acciones</th>
+              {userRole === 'admin' && <th>Acciones</th>}
             </tr>
           </thead>
           <tbody>
@@ -266,42 +282,40 @@ const LoansTable = ({ loans, setLoans, members, userRole, calculateLateFee, getP
                       {statusInfo.icon} {statusInfo.label}
                     </span>
                   </td>
-                  <td className="actions">
-                    <button 
-                      className="action-btn view" 
-                      title="Ver detalles del préstamo"
-                      onClick={() => {
-                        setSelectedLoan(loan);
-                        setModalAction('details');
-                      }}
-                    >
-                      👁️
-                    </button>
-                    {userRole === 'admin' && (
-                      <>
-                        <button 
-                          className="action-btn payment" 
-                          title="Registrar pago"
-                          onClick={() => {
-                            setSelectedLoan(loan);
-                            setModalAction('payment');
-                          }}
-                        >
-                          💳
-                        </button>
-                        <button 
-                          className="action-btn edit" 
-                          title="Editar préstamo"
-                          onClick={() => {
-                            setSelectedLoan(loan);
-                            setModalAction('edit');
-                          }}
-                        >
-                          ✏️
-                        </button>
-                      </>
-                    )}
-                  </td>
+                  {userRole === 'admin' && (
+                    <td className="actions">
+                      <button 
+                        className="action-btn view" 
+                        title="Ver detalles del préstamo"
+                        onClick={() => {
+                          setSelectedLoan(loan);
+                          setModalAction('details');
+                        }}
+                      >
+                        👁️
+                      </button>
+                      <button 
+                        className="action-btn payment" 
+                        title="Registrar pago"
+                        onClick={() => {
+                          setSelectedLoan(loan);
+                          setModalAction('payment');
+                        }}
+                      >
+                        💳
+                      </button>
+                      <button 
+                        className="action-btn edit" 
+                        title="Editar préstamo"
+                        onClick={() => {
+                          setSelectedLoan(loan);
+                          setModalAction('edit');
+                        }}
+                      >
+                        ✏️
+                      </button>
+                    </td>
+                  )}
                 </tr>
               );
             })}

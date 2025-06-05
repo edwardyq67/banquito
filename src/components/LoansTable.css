@@ -191,6 +191,18 @@
   opacity: 0.8;
 }
 
+.loan-row.pending-approval {
+  background: rgba(108, 117, 125, 0.05);
+}
+
+.loan-row.approved {
+  background: rgba(0, 123, 255, 0.05);
+}
+
+.loan-row.rejected {
+  background: rgba(220, 53, 69, 0.08);
+}
+
 .member-info {
   display: flex;
   flex-direction: column;
@@ -222,6 +234,11 @@
   font-size: 0.85rem;
   color: #333;
   font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 8px 0;
 }
 
 .amount {
@@ -351,6 +368,21 @@
 .status-badge.paid {
   background: rgba(108, 117, 125, 0.1);
   color: #6c757d;
+}
+
+.status-badge.pending-approval {
+  background: rgba(108, 117, 125, 0.1);
+  color: #6c757d;
+}
+
+.status-badge.approved {
+  background: rgba(0, 123, 255, 0.1);
+  color: #007bff;
+}
+
+.status-badge.rejected {
+  background: rgba(220, 53, 69, 0.1);
+  color: #dc3545;
 }
 
 .actions {

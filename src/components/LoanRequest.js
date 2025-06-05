@@ -6,6 +6,7 @@ const LoanRequest = ({
   user, 
   members, 
   loans,
+  setLoans,
   settings, 
   getMonthlyInterestRate, 
   calculateAvailableCapital,
@@ -153,6 +154,28 @@ const LoanRequest = ({
     };
 
     setLoanRequests(prev => [...prev, newRequest]);
+    
+    // Agregar también a la tabla de préstamos con estado "Por aprobar"
+    const newLoanEntry = {
+      id: Date.now() + 1, // ID diferente para evitar conflictos
+      memberId: user.memberId,
+      memberName: userMember.name,
+      originalAmount: parseFloat(formData.amount),
+      remainingAmount: parseFloat(formData.amount),
+      weeklyPayment: calculatedData.weeklyPayment,
+      monthlyInterestRate: calculatedData.monthlyInterestRate,
+      totalWeeks: parseInt(formData.installments),
+      totalAmount: calculatedData.totalAmount,
+      startDate: formData.requiredDate,
+      dueDate: formData.requiredDate, // Se actualizará cuando se apruebe
+      status: 'Por aprobar', // Estados: Por aprobar, Aprobada, Rechazada
+      requestDate: new Date().toISOString(),
+      purpose: formData.purpose,
+      paymentHistory: [],
+      requestId: newRequest.id // Referencia a la solicitud original
+    };
+    
+    setLoans(prev => [...prev, newLoanEntry]);
     
     // Guardar la solicitud para mostrar en el modal
     setSubmittedRequest(newRequest);
@@ -505,74 +528,17 @@ const LoanRequest = ({
         </div>
       </div>
 
-      {/* Modal de Éxito */}
-      {showSuccessModal && submittedRequest && (
+      {/* Modal Simple */}
+      {showSuccessModal && (
         <div className="modal-overlay" onClick={() => setShowSuccessModal(false)}>
-          <div className="success-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header success">
-              <div className="success-icon">✅</div>
-              <h2>¡Solicitud Enviada Exitosamente!</h2>
-            </div>
-            
-            <div className="modal-body">
-              <div className="success-message">
-                <p>Tu solicitud de préstamo ha sido registrada y será revisada por el administrador.</p>
-              </div>
-              
-              <div className="request-summary">
-                <h3>📋 Resumen de tu Solicitud</h3>
-                <div className="summary-details">
-                  <div className="summary-row">
-                    <span className="summary-label">📌 Número de Solicitud:</span>
-                    <span className="summary-value">#{submittedRequest.id}</span>
-                  </div>
-                  <div className="summary-row">
-                    <span className="summary-label">💰 Monto Solicitado:</span>
-                    <span className="summary-value">S/ {submittedRequest.amount.toLocaleString()}</span>
-                  </div>
-                  <div className="summary-row">
-                    <span className="summary-label">📅 Plazo:</span>
-                    <span className="summary-value">{submittedRequest.totalWeeks} semanas</span>
-                  </div>
-                  <div className="summary-row">
-                    <span className="summary-label">💳 Cuota Semanal:</span>
-                    <span className="summary-value">S/ {submittedRequest.weeklyPayment.toLocaleString()}</span>
-                  </div>
-                  <div className="summary-row">
-                    <span className="summary-label">📊 Total a Pagar:</span>
-                    <span className="summary-value">S/ {submittedRequest.totalAmount.toLocaleString()}</span>
-                  </div>
-                  <div className="summary-row">
-                    <span className="summary-label">🎯 Propósito:</span>
-                    <span className="summary-value">{submittedRequest.purpose}</span>
-                  </div>
-                  <div className="summary-row">
-                    <span className="summary-label">📆 Fecha Requerida:</span>
-                    <span className="summary-value">
-                      {new Date(submittedRequest.requiredDate).toLocaleDateString('es-ES')}
-                    </span>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="next-steps">
-                <h4>🔄 Próximos Pasos:</h4>
-                <ol>
-                  <li>El administrador revisará tu solicitud en las próximas 24-48 horas</li>
-                  <li>Recibirás una notificación cuando tu solicitud sea procesada</li>
-                  <li>Si es aprobada, el dinero estará disponible en la fecha solicitada</li>
-                </ol>
-              </div>
-              
-              <div className="modal-footer">
-                <button 
-                  className="close-modal-btn"
-                  onClick={() => setShowSuccessModal(false)}
-                >
-                  Entendido
-                </button>
-              </div>
-            </div>
+          <div className="simple-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Solicitud Enviada</h3>
+            <button 
+              className="modal-ok-btn"
+              onClick={() => setShowSuccessModal(false)}
+            >
+              OK
+            </button>
           </div>
         </div>
       )}

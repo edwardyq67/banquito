@@ -10,7 +10,8 @@ const AdminPanel = ({
   setLoans,
   members,
   setMembers,
-  getPaymentWithLateFee
+  getPaymentWithLateFee,
+  settings
 }) => {
   const [activeSection, setActiveSection] = useState('requests');
   const [selectedRequest, setSelectedRequest] = useState(null);
@@ -137,13 +138,19 @@ const AdminPanel = ({
     }));
   };
 
-  // Función para calcular semanas de atraso
-  const calculateWeeksLate = (dueDate) => {
+  // Función para calcular días de atraso
+  const calculateDaysLate = (dueDate) => {
     const today = new Date();
     const due = new Date(dueDate);
     const diffTime = today - due;
-    const diffWeeks = Math.floor(diffTime / (7 * 24 * 60 * 60 * 1000));
-    return Math.max(0, diffWeeks);
+    const diffDays = Math.floor(diffTime / (24 * 60 * 60 * 1000));
+    return Math.max(0, diffDays);
+  };
+
+  // Función para calcular semanas de atraso (para calificación crediticia)
+  const calculateWeeksLate = (dueDate) => {
+    const daysLate = calculateDaysLate(dueDate);
+    return Math.floor(daysLate / 7);
   };
 
   const handleApproveRequest = async (requestId) => {
@@ -334,9 +341,10 @@ const AdminPanel = ({
           updateMemberCreditScore(loan.memberId, scoreChange, reason);
         }
 
-        // Calcular la mora si el pago es tardío
-        const lateFee = weeksLate > 0 ? 
-          (loan.weeklyPayment || loan.monthlyPayment) * (weeksLate * 0.05) : 0;
+        // Calcular la mora si el pago es tardío (diariamente)
+        const daysLate = calculateDaysLate(loan.dueDate);
+        const lateFee = daysLate > 0 ? 
+          (loan.weeklyPayment || loan.monthlyPayment) * ((settings.delinquencyRate / 100) * daysLate) : 0;
         
         const newPaymentHistory = [...loan.paymentHistory, {
           date: date.split('T')[0],
@@ -660,25 +668,25 @@ const AdminPanel = ({
     );
   };
 
-  // Calcular monto con mora (5% adicional por semana vencida)
+  // Calcular monto con mora (tasa diaria por cada día vencido)
   const calculateAmountWithLateFee = (loan) => {
     if (loan.status !== 'overdue' && loan.status !== 'late') {
       return loan.weeklyPayment || loan.monthlyPayment;
     }
 
-    // Calcular semanas de atraso
+    // Calcular días de atraso
     const today = new Date();
     const dueDate = new Date(loan.dueDate);
-    const weeksLate = Math.ceil((today - dueDate) / (7 * 24 * 60 * 60 * 1000));
+    const daysLate = Math.ceil((today - dueDate) / (24 * 60 * 60 * 1000));
 
-    if (weeksLate <= 0) return loan.weeklyPayment || loan.monthlyPayment;
+    if (daysLate <= 0) return loan.weeklyPayment || loan.monthlyPayment;
 
-    // 5% de mora por cada semana de atraso
-    const weeklyPayment = loan.weeklyPayment || loan.monthlyPayment;
-    const lateFeePercentage = weeksLate * 0.05; // 5% por semana
-    const lateFeeAmount = weeklyPayment * lateFeePercentage;
+    // Aplicar tasa de mora diaria configurada en settings
+    const payment = loan.weeklyPayment || loan.monthlyPayment;
+    const dailyLateFeePercentage = (settings.delinquencyRate / 100) * daysLate;
+    const lateFeeAmount = payment * dailyLateFeePercentage;
 
-    return Math.ceil(weeklyPayment + lateFeeAmount);
+    return Math.ceil(payment + lateFeeAmount);
   };
 
   // Función para obtener información del estado del préstamo

@@ -495,6 +495,7 @@ const Dashboard = ({
           user={user}
           members={members}
           loans={loans}
+          setLoans={setLoans}
           settings={settings}
           getMonthlyInterestRate={getMonthlyInterestRate}
           calculateAvailableCapital={calculateAvailableCapital}
@@ -517,6 +518,8 @@ const Dashboard = ({
           setLoans={setLoans}
           members={members}
           setMembers={setMembers}
+          settings={settings}
+          getPaymentWithLateFee={getPaymentWithLateFee}
         />;
       case 'reports':
         return <Reports loans={loans} members={members} />;
