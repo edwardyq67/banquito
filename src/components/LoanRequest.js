@@ -157,7 +157,7 @@ const LoanRequest = ({
     
     // Agregar también a la tabla de préstamos con estado "Por aprobar"
     const newLoanEntry = {
-      id: Date.now() + 1, // ID diferente para evitar conflictos
+      id: newRequest.id, // Usar el mismo ID que la solicitud
       memberId: user.memberId,
       memberName: userMember.name,
       originalAmount: parseFloat(formData.amount),

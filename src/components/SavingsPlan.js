@@ -1,14 +1,31 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './SavingsPlan.css';
 
-const SavingsPlan = ({ memberName, memberId, onSavingsUpdate }) => {
+const SavingsPlan = ({ memberName, memberId, memberData, settings, onSavingsUpdate }) => {
   const [selectedPlan, setSelectedPlan] = useState(180);
   const [showDetails, setShowDetails] = useState(false);
-  const [savingsAmount, setSavingsAmount] = useState('');
+  
+  // Calcular valor inicial basado en acciones del usuario
+  const getInitialAmount = () => {
+    if (memberData && memberData.shares && settings && settings.shareValue) {
+      const shareValue = memberData.shares * settings.shareValue;
+      return Math.max(shareValue, 100); // Mínimo 100
+    }
+    return 1000; // Valor por defecto si no tiene acciones
+  };
+  
+  const [savingsAmount, setSavingsAmount] = useState(getInitialAmount().toString());
   const [isConfiguring, setIsConfiguring] = useState(false);
   const [activeSavings, setActiveSavings] = useState(null);
   
   const TEA = 0.02; // 2% TEA (Tasa Efectiva Anual)
+
+  // Actualizar el monto inicial cuando cambien los datos del miembro
+  useEffect(() => {
+    if (!activeSavings && !isConfiguring) {
+      setSavingsAmount(getInitialAmount().toString());
+    }
+  }, [memberData, settings]);
 
   const plans = [
     { days: 90, months: 3, label: '90 DÍAS' },
@@ -83,9 +100,25 @@ const SavingsPlan = ({ memberName, memberId, onSavingsUpdate }) => {
       
       {!activeSavings && (
         <div className="amount-display">
-          <div className="amount-label">Monto a depositar (dinero externo)</div>
+          <div className="amount-label">Monto a depositar (dinero externo - solo simulación)</div>
+          <div className="amount-note">
+            💡 <em>Puedes modificar el monto para ver diferentes simulaciones</em>
+          </div>
+          <div className="shares-info">
+            {memberData && memberData.shares ? (
+              <small>
+                💼 Valor de tus acciones: {memberData.shares} × S/ {settings?.shareValue || 500} = S/ {((memberData.shares || 0) * (settings?.shareValue || 500)).toLocaleString()}
+              </small>
+            ) : (
+              <small>💼 No tienes acciones registradas</small>
+            )}
+          </div>
           {!isConfiguring ? (
             <div className="amount-config">
+              <div className="current-amount-display">
+                <span className="amount-prefix">Monto actual:</span>
+                <span className="amount-value">S/ {parseFloat(savingsAmount).toLocaleString()}</span>
+              </div>
               <button 
                 className="config-btn"
                 onClick={() => setIsConfiguring(true)}
@@ -171,9 +204,6 @@ const SavingsPlan = ({ memberName, memberId, onSavingsUpdate }) => {
       {!activeSavings && savingsAmount && parseFloat(savingsAmount) > 0 && (
       <div className="savings-result">
         <div className="result-card selected">
-          <div className="result-header">
-            <div className="tea-indicator">TEA: 2.00%</div>
-          </div>
           <div className="result-details">
             <div className="detail-row">
               <span className="detail-label">DÍAS</span>

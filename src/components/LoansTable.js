@@ -52,8 +52,31 @@ const LoansTable = ({ loans, setLoans, members, userRole, calculateLateFee, getP
   };
 
   const filteredAndSortedLoans = useMemo(() => {
-    // Mostrar cada préstamo individualmente (no agrupar por miembro)
-    let filtered = loans.filter(loan => {
+    // Primero eliminar duplicados - mantener solo la entrada más reciente de cada solicitud
+    const uniqueLoans = [];
+    const seenRequestIds = new Set();
+    
+    // Procesar los préstamos del más reciente al más antiguo
+    const sortedByDate = [...loans].sort((a, b) => {
+      const aDate = new Date(a.approvedDate || a.requestDate || 0);
+      const bDate = new Date(b.approvedDate || b.requestDate || 0);
+      return bDate - aDate; // Más reciente primero
+    });
+    
+    for (const loan of sortedByDate) {
+      const requestId = loan.requestId || loan.id;
+      
+      if (!seenRequestIds.has(requestId)) {
+        uniqueLoans.push(loan);
+        seenRequestIds.add(requestId);
+      }
+    }
+    
+    console.log('🔄 Préstamos únicos después de filtrar duplicados:', uniqueLoans.length);
+    console.log('📋 Préstamos únicos:', uniqueLoans);
+    
+    // Luego aplicar filtros de búsqueda y estado
+    let filtered = uniqueLoans.filter(loan => {
       const matchesSearch = loan.memberName.toLowerCase().includes(searchTerm.toLowerCase());
       
       let matchesStatus = true;
@@ -141,19 +164,41 @@ const LoansTable = ({ loans, setLoans, members, userRole, calculateLateFee, getP
     return ((loan.originalAmount - loan.remainingAmount) / loan.originalAmount) * 100;
   };
 
+  // Calcular préstamos únicos para el resumen
+  const uniqueLoansForSummary = useMemo(() => {
+    const uniqueLoans = [];
+    const seenRequestIds = new Set();
+    
+    const sortedByDate = [...loans].sort((a, b) => {
+      const aDate = new Date(a.approvedDate || a.requestDate || 0);
+      const bDate = new Date(b.approvedDate || b.requestDate || 0);
+      return bDate - aDate;
+    });
+    
+    for (const loan of sortedByDate) {
+      const requestId = loan.requestId || loan.id;
+      if (!seenRequestIds.has(requestId)) {
+        uniqueLoans.push(loan);
+        seenRequestIds.add(requestId);
+      }
+    }
+    
+    return uniqueLoans;
+  }, [loans]);
+
   return (
-    <div className="loans-table-container" key={`loans-${refreshKey}-${loans.length}`}>
+    <div className="loans-table-container" key={`loans-${refreshKey}-${uniqueLoansForSummary.length}`}>
       <div className="loans-header">
         <h2>💰 {userRole === 'member' ? 'Mis Préstamos' : 'Registro de Deudores'}</h2>
         <div className="loans-summary">
           <div className="summary-item">
             <span className="summary-label">Total préstamos:</span>
-            <span className="summary-value">{loans.length}</span>
+            <span className="summary-value">{uniqueLoansForSummary.length}</span>
           </div>
           <div className="summary-item">
             <span className="summary-label">Monto total:</span>
             <span className="summary-value">
-              S/ {loans.reduce((sum, loan) => sum + loan.remainingAmount, 0).toLocaleString()}
+              S/ {uniqueLoansForSummary.reduce((sum, loan) => sum + loan.remainingAmount, 0).toLocaleString()}
             </span>
           </div>
         </div>
@@ -333,7 +378,7 @@ const LoansTable = ({ loans, setLoans, members, userRole, calculateLateFee, getP
 
       <div className="table-footer">
         <div className="results-count">
-          Mostrando {filteredAndSortedLoans.length} de {loans.length} préstamos
+          Mostrando {filteredAndSortedLoans.length} de {uniqueLoansForSummary.length} préstamos
         </div>
         
         <div className="status-legend">

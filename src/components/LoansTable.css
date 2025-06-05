@@ -6,7 +6,7 @@
 }
 
 .loans-header {
-  background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+    background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
   color: white;
   padding: 25px 30px;
   display: flex;
@@ -195,11 +195,13 @@
   background: rgba(108, 117, 125, 0.05);
 }
 
-.loan-row.approved {
+.loan-row.approved,
+.loan-row.aprobada {
   background: rgba(0, 123, 255, 0.05);
 }
 
-.loan-row.rejected {
+.loan-row.rejected,
+.loan-row.rechazada {
   background: rgba(220, 53, 69, 0.08);
 }
 
@@ -375,12 +377,14 @@
   color: #6c757d;
 }
 
-.status-badge.approved {
+.status-badge.approved,
+.status-badge.aprobada {
   background: rgba(0, 123, 255, 0.1);
   color: #007bff;
 }
 
-.status-badge.rejected {
+.status-badge.rejected,
+.status-badge.rechazada {
   background: rgba(220, 53, 69, 0.1);
   color: #dc3545;
 }

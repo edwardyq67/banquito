@@ -58,6 +58,32 @@
   margin-bottom: 8px;
 }
 
+.amount-note {
+  color: #3b82f6;
+  font-size: 13px;
+  margin-bottom: 12px;
+  text-align: center;
+  padding: 8px;
+  background-color: rgba(59, 130, 246, 0.05);
+  border-radius: 6px;
+  border: 1px solid rgba(59, 130, 246, 0.1);
+}
+
+.shares-info {
+  text-align: center;
+  margin-bottom: 12px;
+  padding: 8px;
+  background-color: rgba(16, 185, 129, 0.05);
+  border-radius: 6px;
+  border: 1px solid rgba(16, 185, 129, 0.1);
+}
+
+.shares-info small {
+  color: #059669;
+  font-size: 12px;
+  font-weight: 500;
+}
+
 .amount-value {
   color: #333;
   font-size: 24px;
@@ -119,8 +145,6 @@
 .result-card {
   background-color: #f8f9fa;
   border-radius: 8px;
-  padding: 20px;
-  border: 2px solid transparent;
   transition: all 0.3s ease;
 }
 
@@ -147,29 +171,35 @@
 .result-details {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .detail-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 0;
-  border-bottom: 1px solid #e0e0e0;
+  padding: 16px 20px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  min-height: 50px;
+  background: #ffffff;
 }
 
 .detail-row.highlight {
   background-color: rgba(30, 58, 138, 0.05);
-  padding: 12px;
-  margin: 0 -12px;
-  border-radius: 4px;
-  border-bottom: none;
+  padding: 18px 20px;
+  border: 1px solid rgba(30, 58, 138, 0.15);
+  border-radius: 8px;
+  margin: 4px 0;
 }
 
 .detail-row.total {
-  border-bottom: none;
-  padding-top: 12px;
+  border: 2px solid rgba(30, 58, 138, 0.2);
+  padding: 18px 20px;
   font-weight: 600;
+  background-color: rgba(30, 58, 138, 0.08);
+  border-radius: 8px;
+  margin: 4px 0;
 }
 
 .detail-label {
@@ -247,8 +277,29 @@
 /* Nuevos estilos para configuración de monto */
 .amount-config {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
   margin-top: 10px;
+}
+
+.current-amount-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.amount-prefix {
+  color: #666;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.current-amount-display .amount-value {
+  color: #1e3a8a;
+  font-size: 24px;
+  font-weight: 700;
 }
 
 .config-btn {

@@ -50,8 +50,8 @@ const getNextWednesday = (date) => {
   let daysToAdd;
   
   if (day === 3) {
-    // Si ya es miércoles, usar el mismo miércoles
-    daysToAdd = 0;
+    // Si ya es miércoles, ir al próximo miércoles (7 días después)
+    daysToAdd = 7;
   } else if (day < 3) {
     // Si es domingo (0), lunes (1) o martes (2), ir al miércoles de la misma semana
     daysToAdd = 3 - day;

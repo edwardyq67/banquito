@@ -175,38 +175,25 @@ const AdminPanel = ({
     // La primera fecha de pago viene del cronograma
     const firstPaymentDate = paymentSchedule[0]?.dueDate || new Date().toISOString().split('T')[0];
 
-    const newLoan = {
-      id: Date.now(),
-      memberId: request.memberId,
-      memberName: request.memberName,
-      originalAmount: request.amount,
-      remainingAmount: request.amount,
-      installments: request.totalWeeks || request.installments,
-      totalWeeks: request.totalWeeks || request.installments,
-      currentInstallment: 1,
-      currentWeek: 1,
-      interestRate: request.monthlyInterestRate,
-      monthlyPayment: request.weeklyPayment || request.monthlyPayment || 0,
-      weeklyPayment: request.weeklyPayment || request.monthlyPayment || 0,
-      dueDate: firstPaymentDate,
-      status: 'current',
-      paymentHistory: [],
-      paymentSchedule: paymentSchedule, // Agregar cronograma completo
-      approvedDate: new Date().toISOString(),
-      approvedBy: 'admin',
-      purpose: request.purpose,
-      requestDate: request.requestDate
-    };
-
-    console.log('🆕 Nuevo préstamo creado:', newLoan);
-    console.log('📊 Total préstamos antes:', loans.length);
-
-    setLoans(prev => {
-      const updatedLoans = [...prev, newLoan];
-      console.log('📊 Total préstamos después:', updatedLoans.length);
-      console.log('💰 Préstamos actualizados:', updatedLoans);
-      return updatedLoans;
-    });
+    // Actualizar el préstamo existente con estado "Por aprobar" en lugar de crear uno nuevo
+    setLoans(prev => prev.map(loan => {
+      if (loan.requestId === requestId || loan.id === requestId) {
+        return {
+          ...loan,
+          status: 'Aprobada', // Cambiar de "Por aprobar" a "Aprobada"
+          dueDate: firstPaymentDate,
+          paymentSchedule: paymentSchedule,
+          approvedDate: new Date().toISOString(),
+          approvedBy: 'admin',
+          currentInstallment: 1,
+          currentWeek: 1,
+          interestRate: request.monthlyInterestRate,
+          monthlyPayment: request.weeklyPayment || request.monthlyPayment || 0,
+          weeklyPayment: request.weeklyPayment || request.monthlyPayment || 0
+        };
+      }
+      return loan;
+    }));
     
     // Marcar la solicitud como aprobada en lugar de eliminarla
     setLoanRequests(prev => prev.map(r => 
@@ -221,6 +208,19 @@ const AdminPanel = ({
   const handleRejectRequest = (requestId, reason = '') => {
     const request = loanRequests.find(r => r.id === requestId);
     if (!request) return;
+
+    // Actualizar el préstamo existente con estado "Rechazada"
+    setLoans(prev => prev.map(loan => {
+      if (loan.requestId === requestId || loan.id === requestId) {
+        return {
+          ...loan,
+          status: 'Rechazada', // Cambiar de "Por aprobar" a "Rechazada"
+          rejectionReason: reason,
+          rejectedDate: new Date().toISOString()
+        };
+      }
+      return loan;
+    }));
 
     setLoanRequests(prev => prev.map(r =>
       r.id === requestId

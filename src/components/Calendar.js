@@ -54,13 +54,13 @@ const Calendar = ({ loans, members, loanRequests, onUpdateLoan, onUpdateLoanRequ
     if (activeView === 'payments') {
       // Eventos de pagos y vencimientos
       loans.forEach(loan => {
-        // Vencimientos - Restar 1 día para corregir desfase
+        // Vencimientos - Mostrar un día antes para recordatorio
         const dueDate = new Date(loan.dueDate);
         dueDate.setDate(dueDate.getDate() - 1);
         const dueDateStr = dueDate.toISOString().split('T')[0];
         
-        // Debug para préstamos con fechas incorrectas
-        if (loan.memberName === 'edward' || loan.memberName === 'Julia') {
+        // Debug para préstamos con fechas
+        if (loan.memberName === 'Arteaga' || loan.memberName === 'edward' || loan.memberName === 'Julia') {
           console.log('🔍 Calendar Debug - Préstamo:', {
             memberName: loan.memberName,
             originalDueDate: loan.dueDate,
@@ -68,11 +68,13 @@ const Calendar = ({ loans, members, loanRequests, onUpdateLoan, onUpdateLoanRequ
             currentDateStr: dateStr,
             matches: dueDateStr === dateStr,
             status: loan.status,
-            expectedWednesday: loan.dueDate // Debería ser miércoles
+            dayOfWeek: new Date(loan.dueDate).getDay(),
+            expectedWednesday: loan.dueDate // Debería ser miércoles (día 3)
           });
         }
         
-        if (dueDateStr === dateStr && loan.status !== 'paid') {
+        if (dueDateStr === dateStr && loan.status !== 'paid' && 
+            loan.status !== 'Por aprobar' && loan.status !== 'Rechazada') {
           const paymentAmount = loan.weeklyPayment || loan.monthlyPayment || 0;
           const currentWeek = loan.currentWeek || loan.currentInstallment || 1;
           const member = members.find(m => m.id === loan.memberId);
@@ -117,25 +119,13 @@ const Calendar = ({ loans, members, loanRequests, onUpdateLoan, onUpdateLoanRequ
         });
       });
     } else {
-      // Eventos de solicitudes y desembolsos
+      // Eventos de solicitudes y desembolsos - SOLO PENDIENTES
       loanRequests.forEach(request => {
         // Usar requiredDate en lugar de requestDate para mostrar el evento cuando se necesita el dinero
         const eventDate = request.requiredDate ? new Date(request.requiredDate) : new Date(request.requestDate);
         if (eventDate.toISOString().split('T')[0] === dateStr) {
-          if (request.status === 'approved') {
-            events.push({
-              type: 'disbursement',
-              title: `${request.memberName}`,
-              amount: request.amount,
-              amountStr: `S/ ${request.amount.toLocaleString()}`,
-              detail: 'Desembolso aprobado',
-              memberId: request.memberId,
-              requestId: request.id,
-              requiredDate: request.requiredDate,
-              requestDate: request.requestDate
-            });
-          } else if (request.status === 'pending') {
-            // Solo mostrar solicitudes pendientes para poder aprobar/rechazar
+          // SOLO mostrar solicitudes pendientes para poder aprobar/rechazar
+          if (request.status === 'pending') {
             events.push({
               type: 'request',
               title: `${request.memberName}`,
@@ -148,7 +138,7 @@ const Calendar = ({ loans, members, loanRequests, onUpdateLoan, onUpdateLoanRequ
               requestDate: request.requestDate
             });
           }
-          // No mostrar solicitudes rechazadas en el calendario
+          // NO mostrar solicitudes aprobadas, rechazadas o procesadas
         }
       });
     }
@@ -249,50 +239,33 @@ const Calendar = ({ loans, members, loanRequests, onUpdateLoan, onUpdateLoanRequ
         value4: `S/ ${Math.max(0, (totalPorCobrar || 0) - (totalPagosRecibidos || 0)).toLocaleString()}`
       };
     } else {
-      // Mostrar estadísticas directas del Panel de Gestión Administrativa
-      // (Todas las solicitudes actuales, no solo del mes)
-      console.log('📝 Analizando solicitudes del Panel Administrativo:', {
-        totalSolicitudes: loanRequests.length,
-        solicitudesDetalle: loanRequests.map(req => ({
-          member: req.memberName,
-          monto: req.amount,
-          estado: req.status,
-          fecha: req.requestDate
-        }))
-      });
-
-      // Calcular estadísticas globales del Panel Administrativo
-      const totalSolicitudes = loanRequests.length;
-      const montoTotalSolicitado = loanRequests.reduce((sum, req) => sum + (req.amount || 0), 0);
-      const enRevision = loanRequests.filter(r => r.status === 'pending').length;
-      const aprobadas = loanRequests.filter(r => r.status === 'approved').length;
-      const rechazadas = loanRequests.filter(r => r.status === 'rejected').length;
-
-      // Solicitudes del mes actual (para referencia)
-      const solicitudesDelMes = loanRequests.filter(request => {
+      // Estadísticas para la sección de Solicitudes - SOLO PENDIENTES
+      const solicitudesPendientes = loanRequests.filter(r => r.status === 'pending');
+      const montoTotalPendiente = solicitudesPendientes.reduce((sum, req) => sum + (req.amount || 0), 0);
+      
+      // Solicitudes pendientes del mes actual
+      const solicitudesPendientesDelMes = solicitudesPendientes.filter(request => {
         const requestDate = new Date(request.requestDate);
         return requestDate >= firstDay && requestDate <= lastDay;
       }).length;
 
-      console.log('📊 Estadísticas del Panel Administrativo:', {
-        totalSolicitudes,
-        solicitudesDelMes,
-        montoTotalSolicitado,
-        enRevision,
-        aprobadas,
-        rechazadas,
-        porcentajeAprobacion: totalSolicitudes > 0 ? ((aprobadas / totalSolicitudes) * 100).toFixed(1) : 0
+      console.log('📊 Estadísticas de Solicitudes Pendientes:', {
+        totalPendientes: solicitudesPendientes.length,
+        solicitudesPendientesDelMes,
+        montoTotalPendiente
       });
 
       return {
-        label1: 'Total Solicitudes',
-        value1: totalSolicitudes,
-        label2: 'Monto Total Solicitado',
-        value2: `S/ ${(montoTotalSolicitado || 0).toLocaleString()}`,
-        label3: 'En Revisión',
-        value3: enRevision,
-        label4: 'Aprobadas',
-        value4: aprobadas
+        label1: 'Solicitudes Pendientes',
+        value1: solicitudesPendientes.length,
+        label2: 'Monto Total Pendiente',
+        value2: `S/ ${(montoTotalPendiente || 0).toLocaleString()}`,
+        label3: 'Del Mes Actual',
+        value3: solicitudesPendientesDelMes,
+        label4: 'Promedio por Solicitud',
+        value4: solicitudesPendientes.length > 0 ? 
+          `S/ ${Math.round(montoTotalPendiente / solicitudesPendientes.length).toLocaleString()}` : 
+          'S/ 0'
       };
     }
   };
@@ -442,15 +415,20 @@ const Calendar = ({ loans, members, loanRequests, onUpdateLoan, onUpdateLoanRequ
         // Aprobar solicitud y crear préstamo con cronograma específico
         const request = loanRequests.find(r => r.id === eventData.requestId);
         if (request && onUpdateLoanRequest && onUpdateLoan) {
-          // Generar cronograma de pagos usando la fecha requerida
+          // Generar cronograma de pagos usando el próximo miércoles desde la fecha requerida
           const { generateMockPaymentSchedule } = await import('../data/mockDataFinal');
-          const startDate = request.requiredDate || request.requestDate;
+          const requiredDate = new Date(request.requiredDate || request.requestDate);
+          
+          // Calcular el próximo miércoles desde la fecha requerida
+          const nextWednesday = getNextWednesday(requiredDate);
+          const startDate = nextWednesday.toISOString().split('T')[0];
           
           console.log('🔍 Debug Calendar - Aprobando solicitud:', {
             memberName: request.memberName,
             amount: request.amount,
             requiredDate: request.requiredDate,
             requestDate: request.requestDate,
+            nextWednesday: nextWednesday.toLocaleDateString(),
             startDate: startDate
           });
           
@@ -712,11 +690,9 @@ const Calendar = ({ loans, members, loanRequests, onUpdateLoan, onUpdateLoanRequ
                       </div>
                       
                       <div className={`event-type-badge ${event.type}`}>
-                        {event.type === 'payment' && '💰 Vencimiento'}
-                        {event.type === 'payment_made' && '✅ Pagado'}
-                        {event.type === 'disbursement' && '💸 Desembolso'}
-                        {event.type === 'request' && '📝 Solicitud'}
-                        {event.type === 'required_date' && '🎯 Dinero Requerido'}
+                        {event.type === 'payment' && '💰 Pago Programado'}
+                        {event.type === 'payment_made' && '✅ Pago Realizado'}
+                        {event.type === 'request' && '📝 Aprobar/Rechazar'}
                       </div>
                     </div>
                   );
@@ -817,11 +793,9 @@ const EventDetailContent = ({ event, member, onAction, onClose }) => {
           <div className="info-item">
             <span className="label">Tipo:</span>
             <span className={`event-type-label ${event.type}`}>
-              {event.type === 'payment' && '💰 Vencimiento de Pago'}
+              {event.type === 'payment' && '💰 Pago Programado (Registrar)'}
               {event.type === 'payment_made' && '✅ Pago Realizado'}
-              {event.type === 'disbursement' && '💸 Desembolso'}
-              {event.type === 'request' && '📝 Solicitud de Préstamo'}
-              {event.type === 'required_date' && '🎯 Dinero Requerido'}
+              {event.type === 'request' && '📝 Solicitud Pendiente (Aprobar/Rechazar)'}
             </span>
           </div>
           <div className="info-item">
@@ -907,9 +881,9 @@ const EventDetailContent = ({ event, member, onAction, onClose }) => {
           </div>
         )}
 
-        {(event.type === 'payment_made' || event.type === 'disbursement' || event.type === 'required_date') && (
+        {event.type === 'payment_made' && (
           <div className="info-message">
-            <p>ℹ️ {event.type === 'required_date' ? 'Esta es la fecha requerida para el dinero. No hay acciones disponibles.' : 'Este evento ya ha sido procesado. No hay acciones disponibles.'}</p>
+            <p>ℹ️ Este pago ya ha sido registrado. No hay acciones disponibles.</p>
           </div>
         )}
       </div>

@@ -10,6 +10,308 @@ import Calendar from './Calendar';
 import SavingsPlan from './SavingsPlan';
 import TestComponent from './TestComponent';
 
+const MemberLoansSection = ({ userLoans, getStatusInfo }) => {
+  const [currentPage, setCurrentPage] = useState(1);
+  const [dateFilter, setDateFilter] = useState('all'); // all, recent, overdue
+  const itemsPerPage = 5;
+
+  const getFilteredLoans = () => {
+    let filtered = [...userLoans];
+    
+    if (dateFilter === 'recent') {
+      // Préstamos de los últimos 30 días
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      filtered = filtered.filter(loan => new Date(loan.startDate || loan.requestDate) >= thirtyDaysAgo);
+    } else if (dateFilter === 'overdue') {
+      // Solo préstamos vencidos
+      filtered = filtered.filter(loan => {
+        const statusInfo = getStatusInfo(loan);
+        return statusInfo.class === 'overdue';
+      });
+    } else if (dateFilter === 'current') {
+      // Solo préstamos al día
+      filtered = filtered.filter(loan => {
+        const statusInfo = getStatusInfo(loan);
+        return statusInfo.class === 'current' || statusInfo.class === 'due-soon';
+      });
+    }
+    
+    return filtered;
+  };
+
+  const filteredLoans = getFilteredLoans();
+  const totalPages = Math.ceil(filteredLoans.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const currentLoans = filteredLoans.slice(startIndex, startIndex + itemsPerPage);
+
+  const getNextWednesday = () => {
+    const today = new Date();
+    const dayOfWeek = today.getDay();
+    const nextDate = new Date(today);
+    let daysToAdd;
+    
+    if (dayOfWeek === 3) {
+      daysToAdd = 7;
+    } else if (dayOfWeek < 3) {
+      daysToAdd = 3 - dayOfWeek;
+    } else {
+      daysToAdd = 7 - dayOfWeek + 3;
+    }
+    
+    nextDate.setDate(nextDate.getDate() + daysToAdd);
+    return nextDate;
+  };
+
+  return (
+    <>
+      <div className="loans-header" style={{background:"#ffffff"}}>
+        <h3>Filtrar Préstamos</h3>
+        <div className="loans-filters">
+          <select 
+            value={dateFilter} 
+            onChange={(e) => {
+              setDateFilter(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="date-filter"
+          >
+            <option value="all">📋 Todos los préstamos</option>
+            <option value="recent">📅 Recientes (30 días)</option>
+            <option value="overdue">⚠️ Vencidos</option>
+            <option value="current">✅ Al día</option>
+          </select>
+        </div>
+      </div>
+
+      {currentLoans.length > 0 ? (
+        <>
+          <div className="loans-summary">
+            {currentLoans.map(loan => {
+              const progress = ((loan.originalAmount - loan.remainingAmount) / loan.originalAmount) * 100;
+              const statusInfo = getStatusInfo(loan);
+              const weeklyPayment = loan.weeklyPayment || loan.monthlyPayment || 0;
+              
+              return (
+                <div key={loan.id} className="loan-summary-item">
+                  <div className="loan-header">
+                    <div className="loan-amount">
+                      <span className="label">Monto original:</span>
+                      <span className="value">S/ {(loan?.originalAmount || 0).toLocaleString()}</span>
+                    </div>
+                    <div className={`status-indicator ${statusInfo.class}`}>
+                      {statusInfo.icon} {statusInfo.label}
+                    </div>
+                  </div>
+                  
+                  <div className="loan-details">
+                    <div className="detail-row">
+                      <span className="label">Saldo pendiente:</span>
+                      <span className="value">S/ {(loan?.remainingAmount || 0).toLocaleString()}</span>
+                    </div>
+                    <div className="detail-row">
+                      <span className="label">Pago semanal:</span>
+                      <span className="value">S/ {Math.ceil(weeklyPayment)}</span>
+                    </div>
+                    {statusInfo.class === 'overdue' && (
+                      <div className="detail-row overdue">
+                        <span className="label">Total con mora:</span>
+                        <span className="value">S/ {Math.ceil(weeklyPayment * 1.05)}</span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="loan-progress">
+                    <div className="progress-bar">
+                      <div 
+                        className="progress-fill" 
+                        style={{ width: `${progress}%` }}
+                      ></div>
+                    </div>
+                    <div className="progress-info">
+                      <span className="progress-text">{progress.toFixed(1)}% pagado</span>
+                      <span className="weeks-text">
+                        Semana {loan.currentWeek || loan.currentInstallment} de {loan.totalWeeks || loan.installments}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="next-payment-info">
+                    <div className="payment-date">
+                      <span className="label">Próximo pago: </span>
+                      <span className="value">
+                        {getNextWednesday().toLocaleDateString('es-ES', { 
+                          weekday: 'long', 
+                          day: 'numeric', 
+                          month: 'long' 
+                        })}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          
+          {totalPages > 1 && (
+            <div className="loans-pagination">
+              <button 
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className="pagination-btn"
+              >
+                ← Anterior
+              </button>
+              <span className="pagination-info">
+                Página {currentPage} de {totalPages} ({filteredLoans.length} préstamos)
+              </span>
+              <button 
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+                className="pagination-btn"
+              >
+                Siguiente →
+              </button>
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="no-data">
+          {dateFilter === 'overdue' ? 'No tienes préstamos vencidos' : 
+           dateFilter === 'recent' ? 'No tienes préstamos recientes' : 
+           dateFilter === 'current' ? 'No tienes préstamos al día' :
+           'No tienes préstamos activos'}
+        </div>
+      )}
+    </>
+  );
+};
+
+const MemberNotificationsSection = ({ userNotifications }) => {
+  const [notificationFilter, setNotificationFilter] = useState('all');
+  
+  const getFilteredNotifications = () => {
+    let filtered = [...userNotifications];
+    
+    if (notificationFilter === 'approved') {
+      filtered = filtered.filter(notification => notification.type === 'approved');
+    } else if (notificationFilter === 'rejected') {
+      filtered = filtered.filter(notification => notification.type === 'rejected');
+    }
+    
+    return filtered;
+  };
+
+  const filteredNotifications = getFilteredNotifications();
+
+  return (
+    <>
+      <div className="notifications-header">
+        <h3>🔔 Notificaciones</h3>
+        <div className="notifications-filters">
+          <select 
+            value={notificationFilter} 
+            onChange={(e) => setNotificationFilter(e.target.value)}
+            className="notification-filter"
+          >
+            <option value="all">📋 Todas</option>
+            <option value="approved">✅ Aprobadas</option>
+            <option value="rejected">❌ Rechazadas</option>
+          </select>
+        </div>
+      </div>
+
+      {filteredNotifications.length > 0 ? (
+        <div className="notifications-list">
+          {filteredNotifications.map(notification => (
+            <div key={notification.id} className={`notification-item ${notification.type}`}>
+              <div className="notification-header">
+                <div className="notification-status">
+                  {notification.type === 'approved' && (
+                    <span className="status-badge approved">✅ Solicitud Aprobada</span>
+                  )}
+                  {notification.type === 'rejected' && (
+                    <span className="status-badge rejected">❌ Solicitud Rechazada</span>
+                  )}
+                </div>
+                <div className="notification-date">
+                  {new Date(notification.date).toLocaleDateString('es-ES')}
+                </div>
+              </div>
+              
+              <div className="notification-content">
+                <div className="notification-message">{notification.message}</div>
+                
+                {notification.type === 'approved' && (
+                  <div className="approval-details">
+                    <div className="details-grid">
+                      <div className="detail-card">
+                        <div className="detail-icon">💰</div>
+                        <div className="detail-info">
+                          <span className="detail-label">Monto</span>
+                          <span className="detail-value">S/ {(notification.amount || 0).toLocaleString()}</span>
+                        </div>
+                      </div>
+                      
+                      <div className="detail-card">
+                        <div className="detail-icon">📅</div>
+                        <div className="detail-info">
+                          <span className="detail-label">Plazo</span>
+                          <span className="detail-value">{notification.totalWeeks || notification.installments} semanas</span>
+                        </div>
+                      </div>
+                      
+                      <div className="detail-card">
+                        <div className="detail-icon">💳</div>
+                        <div className="detail-info">
+                          <span className="detail-label">Pago Semanal</span>
+                          <span className="detail-value">S/ {(notification.weeklyPayment || notification.monthlyPayment || 0).toLocaleString()}</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="success-alert">
+                      <div className="alert-icon">🎉</div>
+                      <div className="alert-content">
+                        <strong>¡Felicidades!</strong> Tu préstamo será procesado el próximo miércoles (día de operaciones).
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {notification.type === 'rejected' && notification.reason && (
+                  <div className="rejection-details">
+                    <div className="rejection-reason">
+                      <div className="reason-icon">📝</div>
+                      <div className="reason-content">
+                        <span className="reason-label">Motivo del rechazo:</span>
+                        <span className="reason-text">{notification.reason}</span>
+                      </div>
+                    </div>
+                    
+                    <div className="info-alert">
+                      <div className="alert-icon">💡</div>
+                      <div className="alert-content">
+                        Puedes realizar una nueva solicitud después de mejorar tu situación crediticia.
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="no-data">
+          {notificationFilter === 'approved' ? 'No tienes solicitudes aprobadas' : 
+           notificationFilter === 'rejected' ? 'No tienes solicitudes rechazadas' : 
+           'No tienes notificaciones nuevas'}
+        </div>
+      )}
+    </>
+  );
+};
+
 const Dashboard = ({ 
   user, 
   loans, 
@@ -58,6 +360,19 @@ const Dashboard = ({
 
   const getUserLoans = () => {
     if (user.role === 'member' && user.memberId) {
+      // Solo préstamos realmente activos (excluir solicitudes pendientes y rechazadas)
+      return loans.filter(loan => 
+        loan.memberId === user.memberId && 
+        loan.status !== 'Por aprobar' && 
+        loan.status !== 'Rechazada'
+      );
+    }
+    return [];
+  };
+
+  const getAllUserLoans = () => {
+    if (user.role === 'member' && user.memberId) {
+      // Todos los préstamos del usuario (incluyendo solicitudes pendientes)
       return loans.filter(loan => loan.memberId === user.memberId);
     }
     return [];
@@ -321,152 +636,39 @@ const Dashboard = ({
         )}
 
         {user.role === 'member' && (
-          <div className="dashboard-sections">
-            <div className="section my-loans-detail">
-              <h3>💳 Mis Préstamos Activos</h3>
-              {userLoans.length > 0 ? (
-                <div className="loans-summary">
-                  {userLoans.map(loan => {
-                    const progress = ((loan.originalAmount - loan.remainingAmount) / loan.originalAmount) * 100;
-                    const statusInfo = getStatusInfo(loan);
-                    const weeklyPayment = loan.weeklyPayment || loan.monthlyPayment || 0;
-                    
-                    return (
-                      <div key={loan.id} className="loan-summary-item">
-                        <div className="loan-header">
-                          <div className="loan-amount">
-                            <span className="label">Monto original:</span>
-                            <span className="value">S/ {(loan?.originalAmount || 0).toLocaleString()}</span>
-                          </div>
-                          <div className={`status-indicator ${statusInfo.class}`}>
-                            {statusInfo.icon} {statusInfo.label}
-                          </div>
-                        </div>
-                        
-                        <div className="loan-details">
-                          <div className="detail-row">
-                            <span className="label">Saldo pendiente:</span>
-                            <span className="value">S/ {(loan?.remainingAmount || 0).toLocaleString()}</span>
-                          </div>
-                          <div className="detail-row">
-                            <span className="label">Pago semanal:</span>
-                            <span className="value">S/ {Math.ceil(weeklyPayment)}</span>
-                          </div>
-                          {statusInfo.class === 'overdue' && (
-                            <div className="detail-row overdue">
-                              <span className="label">Total con mora:</span>
-                              <span className="value">S/ {Math.ceil(weeklyPayment * 1.05)}</span>
-                            </div>
-                          )}
-                        </div>
-                        
-                        <div className="loan-progress">
-                          <div className="progress-bar">
-                            <div 
-                              className="progress-fill" 
-                              style={{ width: `${progress}%` }}
-                            ></div>
-                          </div>
-                          <div className="progress-info">
-                            <span className="progress-text">{progress.toFixed(1)}% pagado</span>
-                            <span className="weeks-text">
-                              Semana {loan.currentWeek || loan.currentInstallment} de {loan.totalWeeks || loan.installments}
-                            </span>
-                          </div>
-                        </div>
-                        
-                        <div className="next-payment-info">
-                          <div className="payment-date">
-                            <span className="label">Próximo pago: </span>
-                            <span className="value">
-                              {getNextWednesday().toLocaleDateString('es-ES', { 
-                                weekday: 'long', 
-                                day: 'numeric', 
-                                month: 'long' 
-                              })}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="no-data">No tienes préstamos activos</div>
-              )}
+          <div className="dashboard-sections-member">
+            <div className="loans-column">
+              <div className="section my-loans-detail">
+                <h3>💳 Mis Préstamos Activos</h3>
+                <MemberLoansSection 
+                  userLoans={userLoans} 
+                  getStatusInfo={getStatusInfo}
+                />
+              </div>
             </div>
 
-            {/* Sección de Notificaciones para Miembros */}
-            <div className="section member-notifications">
-              <h3>🔔 Notificaciones</h3>
-              {userNotifications.length > 0 ? (
-                <div className="notifications-list">
-                  {userNotifications.map(notification => (
-                    <div key={notification.id} className={`notification-item ${notification.type}`}>
-                      <div className="notification-header">
-                        <div className="notification-title">{notification.title}</div>
-                        <div className="notification-date">
-                          {new Date(notification.date).toLocaleDateString('es-ES')}
-                        </div>
-                      </div>
-                      <div className="notification-content">
-                        <div className="notification-message">{notification.message}</div>
-                        {notification.type === 'approved' && (
-                          <div className="notification-details">
-                            <div className="detail-item">
-                              <span className="detail-label">💰 Monto:</span>
-                              <span className="detail-value">S/ {(notification.amount || 0).toLocaleString()}</span>
-                            </div>
-                            <div className="detail-item">
-                              <span className="detail-label">📅 Plazo:</span>
-                              <span className="detail-value">{notification.totalWeeks || notification.installments} semanas</span>
-                            </div>
-                            <div className="detail-item">
-                              <span className="detail-label">💳 Pago semanal:</span>
-                              <span className="detail-value">S/ {(notification.weeklyPayment || notification.monthlyPayment || 0).toLocaleString()}</span>
-                            </div>
-                            <div className="notification-action">
-                              <div className="success-message">
-                                ✅ Tu préstamo será procesado en el próximo día de operaciones (miércoles)
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                        {notification.type === 'rejected' && notification.reason && (
-                          <div className="notification-details">
-                            <div className="rejection-reason">
-                              <span className="detail-label">📝 Motivo:</span>
-                              <span className="detail-value">{notification.reason}</span>
-                            </div>
-                            <div className="notification-action">
-                              <div className="info-message">
-                                💡 Puedes realizar una nueva solicitud después de mejorar tu situación crediticia
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="no-data">No tienes notificaciones nuevas</div>
-              )}
-            </div>
+            <div className="notifications-column">
+              {/* Sección de Notificaciones para Miembros */}
+              <div className="section member-notifications">
+                <MemberNotificationsSection 
+                  userNotifications={userNotifications}
+                />
+              </div>
 
-            {/* Sección de Plan de Ahorro para Miembros */}
-            <div className="section member-savings-plan">
-              <h3>💰 Mi Plan de Ahorro a Plazo Fijo</h3>
-              <div className="savings-plan-info">
-                <p className="savings-intro">
-                  Haz crecer tu garantía con nuestro plan de ahorro a plazo fijo con una TEA del 2%
-                </p>
-                <button 
-                  className="view-savings-plan-btn"
-                  onClick={() => setActiveTab('savings')}
-                >
-                  Ver Plan de Ahorro
-                </button>
+              {/* Sección de Plan de Ahorro para Miembros */}
+              <div className="section member-savings-plan">
+                <h3>💰 Mi Plan de Ahorro a Plazo Fijo</h3>
+                <div className="savings-plan-info">
+                  <p className="savings-intro">
+                    Haz crecer tu garantía con nuestro plan de ahorro a plazo fijo con una TEA del 2%
+                  </p>
+                  <button 
+                    className="view-savings-plan-btn"
+                    onClick={() => setActiveTab('savings')}
+                  >
+                    Ver Plan de Ahorro
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -483,7 +685,7 @@ const Dashboard = ({
         return renderDashboardContent();
       case 'loans':
         return <LoansTable 
-          loans={user.role === 'member' ? getUserLoans() : loans}
+          loans={user.role === 'member' ? getAllUserLoans() : loans}
           setLoans={setLoans}
           members={members}
           userRole={user.role}
@@ -539,6 +741,8 @@ const Dashboard = ({
           return <SavingsPlan 
             memberName={userMember.name}
             memberId={user.memberId}
+            memberData={userMember}
+            settings={settings}
             onSavingsUpdate={(savingsData) => {
               console.log('Nuevo plan de ahorro:', savingsData);
               // Aquí se podría guardar en el estado si es necesario
