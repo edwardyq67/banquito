@@ -31,14 +31,53 @@
 }
 
 .summary-label {
-  font-size: 0.85rem;
-  opacity: 0.9;
+  font-size: 1rem;
+  color: white !important;
+  font-weight: 700;
   margin-bottom: 2px;
 }
 
 .summary-value {
-  font-size: 1.2rem;
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: white !important;
+}
+
+.refresh-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  padding: 8px 15px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.3s ease;
+}
+
+.refresh-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: translateY(-1px);
+}
+
+.loans-count {
+  font-size: 0.8rem;
+  color: #666;
+  font-weight: normal;
+  display: block;
+  margin-top: 2px;
+}
+
+.loans-total {
+  font-size: 0.9rem;
+  color: #666;
   font-weight: bold;
+}
+
+.payment-subtitle {
+  font-size: 0.8rem;
+  color: #666;
+  margin-top: 2px;
 }
 
 .loans-controls {
@@ -168,6 +207,23 @@
   color: #888;
 }
 
+.member-info .loan-id {
+  font-size: 0.7rem;
+  color: #1e3a8a;
+  background: #e3f2fd;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-weight: 500;
+  margin-top: 2px;
+  align-self: flex-start;
+}
+
+.current-week {
+  font-size: 0.85rem;
+  color: #333;
+  font-weight: 500;
+}
+
 .amount {
   font-weight: 600;
   color: #333;
@@ -227,6 +283,38 @@
 .payment {
   font-weight: 600;
   color: #28a745;
+}
+
+.payment-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.base-payment {
+  font-weight: 600;
+  color: #28a745;
+}
+
+.payment-with-late {
+  font-weight: 700;
+  color: #dc3545;
+  font-size: 0.95rem;
+  padding: 2px 6px;
+  background: rgba(220, 53, 69, 0.1);
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.fee-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fee-amount {
+  font-weight: 600;
+  color: #dc3545;
 }
 
 .due-date {

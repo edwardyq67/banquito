@@ -698,26 +698,6 @@ export const initialLoanRequests = [
   },
   {
     id: 5,
-    memberId: 1, // Arteaga
-    memberName: 'Arteaga',
-    amount: 3500,
-    installments: 15,
-    purpose: 'Ampliación de negocio',
-    requestDate: '2025-05-20',
-    requiredDate: '2025-06-05',
-    status: 'approved',
-    interestRate: 5,
-    monthlyIncome: 4500,
-    otherDebts: 500,
-    guaranteeOffered: 10000,
-    comments: 'Aprobado por excelente historial crediticio',
-    documents: ['dni', 'income_proof', 'business_plan'],
-    approvedDate: '2025-05-22',
-    approvedBy: 'admin',
-    monthlyPayment: 275.50
-  },
-  {
-    id: 6,
     memberId: 17,
     memberName: 'T.Lujan',
     amount: 5000,
@@ -909,38 +889,43 @@ export const initialLoanRequests = [
 ];
 
 export const generateMockPaymentSchedule = (loanAmount, installments, interestRate, startDate) => {
-  // Interés fijo sobre el monto original
-  const totalInterest = loanAmount * (interestRate / 100);
+  // Interés semanal (convertir tasa mensual a semanal)
+  const weeklyInterestRate = interestRate / 4.33; // Aproximadamente 4.33 semanas por mes
+  const totalInterest = loanAmount * (weeklyInterestRate / 100) * installments;
   const totalAmount = loanAmount + totalInterest;
-  const monthlyPayment = totalAmount / installments;
+  const weeklyPayment = totalAmount / installments;
   
-  // Pago mensual fijo de capital (sin intereses en cada cuota)
-  const monthlyPrincipal = loanAmount / installments;
+  // Pago semanal fijo de capital (sin intereses en cada cuota)
+  const weeklyPrincipal = loanAmount / installments;
   // El interés se distribuye equitativamente entre todas las cuotas
-  const monthlyInterest = totalInterest / installments;
+  const weeklyInterest = totalInterest / installments;
   
   const schedule = [];
   let remainingBalance = loanAmount;
   let currentDate = new Date(startDate);
   
+  // Primera cuota siempre es el próximo miércoles
+  currentDate = getNextWednesday(currentDate);
+  
   for (let i = 1; i <= installments; i++) {
-    // Agregar un mes y encontrar el miércoles más cercano
-    currentDate.setMonth(currentDate.getMonth() + 1);
-    const wednesdayDate = getNextWednesday(currentDate);
-    
-    remainingBalance -= monthlyPrincipal;
+    remainingBalance -= weeklyPrincipal;
     
     schedule.push({
+      week: i,
       installment: i,
-      dueDate: wednesdayDate.toISOString().split('T')[0],
-      monthlyPayment: Math.round(monthlyPayment * 100) / 100,
-      principalPayment: Math.round(monthlyPrincipal * 100) / 100,
-      interestPayment: Math.round(monthlyInterest * 100) / 100,
-      remainingBalance: Math.max(0, Math.round(remainingBalance * 100) / 100),
+      dueDate: currentDate.toISOString().split('T')[0],
+      weeklyPayment: Math.ceil(weeklyPayment), // Redondear hacia arriba
+      monthlyPayment: Math.ceil(weeklyPayment), // Para compatibilidad
+      capitalPayment: Math.ceil(weeklyPrincipal),
+      principalPayment: Math.ceil(weeklyPrincipal),
+      interestPayment: Math.ceil(weeklyInterest),
+      remainingBalance: Math.max(0, Math.ceil(remainingBalance)),
       status: 'pending'
     });
     
-    currentDate = new Date(wednesdayDate);
+    // Siguiente miércoles
+    currentDate = new Date(currentDate);
+    currentDate.setDate(currentDate.getDate() + 7);
   }
   
   return schedule;

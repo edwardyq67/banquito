@@ -224,9 +224,9 @@
 }
 
 .charts-section {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
   gap: 30px;
+  margin-top: 30px;
 }
 
 .chart-card {
@@ -234,18 +234,39 @@
   border-radius: 12px;
   padding: 25px;
   border: 1px solid #e0e0e0;
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.3s ease;
+  flex: 1;
+}
+
+.chart-card:hover {
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
 }
 
 .chart-card h3 {
   margin: 0 0 20px 0;
   color: #333;
   font-size: 1.2rem;
+  text-align: center;
+}
+
+.pie-chart-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  flex: 1;
 }
 
 .chart-legend {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  align-items: center;
 }
 
 .legend-item {
@@ -594,6 +615,84 @@
   margin-top: 5px;
 }
 
+.schedule-filters {
+  background: #f8f9fa;
+  border-radius: 10px;
+  padding: 20px;
+  margin: 20px 0;
+  display: flex;
+  gap: 20px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  border: 1px solid #e0e0e0;
+}
+
+.schedule-filters .filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.schedule-filters label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #495057;
+}
+
+.schedule-filters .filter-input {
+  padding: 10px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 1rem;
+  min-width: 200px;
+  transition: border-color 0.3s ease;
+}
+
+.schedule-filters .filter-input:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.schedule-filters .filter-select {
+  padding: 10px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 1rem;
+  min-width: 180px;
+  background: white;
+  cursor: pointer;
+  transition: border-color 0.3s ease;
+}
+
+.schedule-filters .filter-select:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.schedule-filters .checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 10px 15px;
+  background: white;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  margin-top: 20px;
+}
+
+.schedule-filters .checkbox-label:hover {
+  border-color: #667eea;
+  background: rgba(102, 126, 234, 0.05);
+}
+
+.schedule-filters .checkbox-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
 .schedule-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
@@ -767,9 +866,12 @@
     align-items: flex-start;
     gap: 15px;
   }
-  
-  .charts-section {
-    grid-template-columns: 1fr;
+}
+
+@media (max-width: 768px) {
+  .charts-section,
+  .charts-section.screen-only {
+    flex-direction: column;
   }
   
   .collection-summary {
@@ -986,5 +1088,286 @@
   
   .payment-date {
     font-size: 0.7rem;
+  }
+}
+
+/* Ocultar elementos de impresión en la pantalla */
+.print-header,
+.print-section,
+.print-title,
+.section-title {
+  display: none;
+}
+
+/* Mostrar elementos normales en pantalla */
+.screen-only {
+  display: block;
+}
+
+/* Estilo específico para charts-section screen-only */
+.charts-section.screen-only {
+  display: flex;
+  gap: 30px;
+  margin-top: 30px;
+}
+
+/* ===== ESTILOS ESPECÍFICOS PARA IMPRESIÓN ===== */
+@media print {
+  /* Configuración general de impresión */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Arial', sans-serif;
+    font-size: 12pt;
+    line-height: 1.4;
+    color: #000;
+  }
+
+  /* Ocultar elementos que no deben imprimirse */
+  .reports-header,
+  .report-tabs,
+  .report-actions,
+  .print-btn,
+  .export-btn,
+  .screen-only,
+  .report-footer {
+    display: none !important;
+  }
+
+  /* Mostrar elementos específicos de impresión */
+  .print-header,
+  .print-section,
+  .section-title {
+    display: block !important;
+  }
+  
+  /* Agregar título antes de las estadísticas */
+  .stats-grid::before {
+    content: "📈 ESTADÍSTICAS PRINCIPALES";
+    display: block;
+    font-size: 14pt;
+    color: #1e3a8a;
+    margin: 0 0 15px 0;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #e0e0e0;
+    font-weight: bold;
+  }
+
+  /* Configuración del contenedor principal */
+  .reports-container {
+    max-width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  .print-overview {
+    max-width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* Header de impresión */
+  .print-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 0;
+    border-bottom: 2px solid #1e3a8a;
+    margin-bottom: 20px;
+    page-break-after: avoid;
+  }
+
+  .print-title h1 {
+    margin: 0;
+    font-size: 18pt;
+    color: #1e3a8a;
+    font-weight: bold;
+  }
+
+  .print-date {
+    margin-top: 5px;
+    font-size: 10pt;
+    color: #666;
+  }
+
+  .print-logo {
+    text-align: right;
+  }
+
+  .logo-placeholder {
+    font-size: 18pt;
+    color: #1e3a8a;
+    font-weight: bold;
+  }
+
+  /* Secciones de impresión */
+  .print-section {
+    margin-bottom: 25px;
+    page-break-inside: avoid;
+  }
+
+  .section-title {
+    font-size: 14pt;
+    color: #1e3a8a;
+    margin: 0 0 15px 0;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #e0e0e0;
+    font-weight: bold;
+  }
+
+  /* Grid de estadísticas para impresión */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+    margin-bottom: 20px;
+  }
+
+  .stat-card {
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    padding: 12px;
+    background: #f9f9f9;
+    page-break-inside: avoid;
+  }
+
+  .stat-card.primary { border-color: #1e3a8a; background: #f0f4ff; }
+  .stat-card.success { border-color: #16a34a; background: #f0fdf4; }
+  .stat-card.warning { border-color: #ca8a04; background: #fffbeb; }
+  .stat-card.danger { border-color: #dc2626; background: #fef2f2; }
+
+  .stat-content h3 {
+    margin: 0 0 5px 0;
+    font-size: 11pt;
+    color: #333;
+    font-weight: bold;
+  }
+
+  .stat-value {
+    font-size: 16pt;
+    font-weight: bold;
+    color: #000;
+    margin-bottom: 3px;
+  }
+
+  .stat-subtitle {
+    font-size: 9pt;
+    color: #666;
+  }
+
+  .stat-icon {
+    display: none; /* Ocultar iconos en impresión */
+  }
+
+  /* Tablas para impresión */
+  .print-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    page-break-inside: avoid;
+  }
+
+  .print-table th,
+  .print-table td {
+    border: 1px solid #333;
+    padding: 12px 8px;
+    text-align: left;
+    font-size: 11pt;
+  }
+
+  .print-table th {
+    background-color: #1e3a8a;
+    color: white;
+    font-weight: bold;
+    text-align: center;
+  }
+
+  .print-table tbody tr:nth-child(even) {
+    background-color: #f9f9f9;
+  }
+
+  .print-table tbody tr:nth-child(odd) {
+    background-color: white;
+  }
+
+  /* Filas especiales */
+  .total-row td {
+    border-top: 2px solid #333;
+    font-weight: bold;
+    background-color: #e8f4f8 !important;
+  }
+
+  .highlight-row td {
+    background-color: #fff3cd !important;
+    font-weight: bold;
+  }
+
+  .status-current td:first-child { color: #16a34a; font-weight: bold; }
+  .status-paid td:first-child { color: #059669; font-weight: bold; }
+  .status-overdue td:first-child { color: #dc2626; font-weight: bold; }
+
+  /* Sección de análisis */
+  .analysis-content {
+    margin-top: 15px;
+  }
+
+  .analysis-item {
+    margin-bottom: 20px;
+    padding: 15px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    background: #f9fafb;
+    page-break-inside: avoid;
+  }
+
+  .analysis-item h4 {
+    margin: 0 0 10px 0;
+    font-size: 12pt;
+    color: #1e3a8a;
+    font-weight: bold;
+  }
+
+  .analysis-item p {
+    margin: 0;
+    font-size: 11pt;
+    line-height: 1.5;
+    color: #374151;
+  }
+
+  /* Configuración de páginas */
+  @page {
+    size: A4;
+    margin: 1in;
+  }
+
+  /* Saltos de página */
+  .print-section:first-of-type {
+    margin-top: 0;
+  }
+
+  /* Solo agregar salto de página después de la tabla de distribución */
+  .print-section:nth-child(3) {
+    page-break-after: always;
+  }
+
+  /* Footer para impresión */
+  .report-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 40px;
+    background: white;
+    border-top: 1px solid #333;
+    padding: 10px 0;
+    text-align: center;
+    font-size: 10pt;
+    color: #666;
   }
 }

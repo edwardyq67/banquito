@@ -81,34 +81,126 @@ export const getCreditScoreDescription = (creditScore) => {
 // Función para encontrar el próximo miércoles desde una fecha dada
 const getNextWednesday = (date) => {
   const d = new Date(date);
-  const day = d.getDay();
-  const daysUntilWednesday = (3 - day + 7) % 7;
-  if (daysUntilWednesday === 0 && d.getDay() === 3) {
-    return d;
+  const day = d.getDay(); // 0 = domingo, 1 = lunes, ..., 3 = miércoles, ..., 6 = sábado
+  
+  console.log('🗓️ getNextWednesday - Input:', {
+    inputDate: date,
+    parsedDate: d.toISOString().split('T')[0],
+    dayOfWeek: day,
+    dayName: ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'][day]
+  });
+  
+  let daysToAdd;
+  
+  if (day === 3) {
+    // Si ya es miércoles, usar el mismo miércoles
+    daysToAdd = 0;
+  } else if (day < 3) {
+    // Si es domingo (0), lunes (1) o martes (2), ir al miércoles de la misma semana
+    daysToAdd = 3 - day;
+  } else {
+    // Si es jueves (4), viernes (5) o sábado (6), ir al miércoles de la próxima semana
+    daysToAdd = 7 - day + 3;
   }
-  d.setDate(d.getDate() + (daysUntilWednesday === 0 ? 7 : daysUntilWednesday));
+  
+  d.setDate(d.getDate() + daysToAdd);
+  
+  console.log('✅ getNextWednesday - Output:', {
+    resultDate: d.toISOString().split('T')[0],
+    daysAdded: daysToAdd,
+    resultDayOfWeek: d.getDay(),
+    resultDayName: ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'][d.getDay()],
+    isWednesday: d.getDay() === 3
+  });
+  
   return d;
 };
 
-// SISTEMA DE CÁLCULO: Pagos semanales con interés mensual
+// SISTEMA DE CÁLCULO: Amortización Francesa (Cuota Fija)
+// Fórmula: Cuota = [Monto * (TEM x (1 + TEM)^n)] / [(1 + TEM)^n - 1]
 export const calculateLoanPayment = (amount, monthlyInterestRate, totalWeeks) => {
-  // Distribución del capital en pagos semanales
-  const weeklyCapital = amount / totalWeeks;
-  
-  // El interés mensual se aplica por cada mes del préstamo
+  // Convertir semanas a meses para el cálculo
   const totalMonths = Math.ceil(totalWeeks / 4);
-  const totalInterest = amount * (monthlyInterestRate / 100) * totalMonths;
   
-  // Pago semanal total (redondeado hacia arriba)
-  const weeklyPayment = (amount + totalInterest) / totalWeeks;
+  // Tasa de interés mensual en decimal
+  const TEM = monthlyInterestRate / 100;
+  
+  // Si la tasa es 0, dividir el monto entre los meses
+  if (TEM === 0) {
+    const monthlyPayment = amount / totalMonths;
+    const weeklyPayment = monthlyPayment / 4;
+    
+    return {
+      monthlyPayment: Math.round(monthlyPayment * 100) / 100,
+      weeklyPayment: Math.ceil(weeklyPayment),
+      totalInterest: 0,
+      totalAmount: amount,
+      totalMonths: totalMonths
+    };
+  }
+  
+  // Aplicar fórmula de amortización francesa
+  const potencia = Math.pow(1 + TEM, totalMonths);
+  const monthlyPayment = amount * (TEM * potencia) / (potencia - 1);
+  
+  // Calcular el pago semanal (dividir el pago mensual entre 4 semanas)
+  const weeklyPayment = monthlyPayment / 4;
+  
+  // Calcular el total a pagar y los intereses
+  const totalAmount = monthlyPayment * totalMonths;
+  const totalInterest = totalAmount - amount;
   
   return {
+    monthlyPayment: Math.round(monthlyPayment * 100) / 100,
     weeklyPayment: Math.ceil(weeklyPayment),
-    weeklyCapital: Math.round(weeklyCapital * 100) / 100,
     totalInterest: Math.round(totalInterest * 100) / 100,
-    totalAmount: Math.round((amount + totalInterest) * 100) / 100,
-    totalMonths: totalMonths
+    totalAmount: Math.round(totalAmount * 100) / 100,
+    totalMonths: totalMonths,
+    weeklyCapital: Math.round((amount / totalWeeks) * 100) / 100
   };
+};
+
+// Función auxiliar para calcular el cronograma de pagos detallado
+export const calculateAmortizationSchedule = (amount, monthlyInterestRate, totalMonths) => {
+  const TEM = monthlyInterestRate / 100;
+  const schedule = [];
+  let remainingBalance = amount;
+  
+  // Si la tasa es 0, dividir el capital equitativamente
+  if (TEM === 0) {
+    const monthlyCapital = amount / totalMonths;
+    for (let i = 1; i <= totalMonths; i++) {
+      schedule.push({
+        month: i,
+        payment: monthlyCapital,
+        interest: 0,
+        capital: monthlyCapital,
+        balance: Math.round((remainingBalance - monthlyCapital) * 100) / 100
+      });
+      remainingBalance -= monthlyCapital;
+    }
+    return schedule;
+  }
+  
+  // Calcular cuota fija con fórmula francesa
+  const potencia = Math.pow(1 + TEM, totalMonths);
+  const monthlyPayment = amount * (TEM * potencia) / (potencia - 1);
+  
+  for (let i = 1; i <= totalMonths; i++) {
+    const interest = remainingBalance * TEM;
+    const capital = monthlyPayment - interest;
+    remainingBalance -= capital;
+    
+    schedule.push({
+      month: i,
+      payment: Math.round(monthlyPayment * 100) / 100,
+      interest: Math.round(interest * 100) / 100,
+      capital: Math.round(capital * 100) / 100,
+      balance: Math.round(Math.max(0, remainingBalance) * 100) / 100
+    });
+  }
+  
+  return schedule;
 };
 
 // Préstamos activos con nueva lógica
@@ -124,8 +216,8 @@ export const initialLoans = [
     currentWeek: 5,
     monthlyInterestRate: 3,
     weeklyPayment: 325, // Math.ceil((5000 + 750) / 20) = 288
-    dueDate: '2025-05-28',
-    status: 'current',
+    dueDate: '2025-05-27',
+    status: 'overdue',
     startDate: '2025-01-01',
     paymentHistory: [
       { date: '2025-01-08', amount: 325, type: 'weekly' },
@@ -146,7 +238,7 @@ export const initialLoans = [
     currentWeek: 4,
     monthlyInterestRate: 5,
     weeklyPayment: 288, // Math.ceil((3000 + 450) / 12) = 288
-    dueDate: '2025-05-14',
+    dueDate: '2025-03-26',
     status: 'overdue',
     startDate: '2025-03-01',
     paymentHistory: [
@@ -189,7 +281,7 @@ export const initialLoans = [
     monthlyInterestRate: 3,
     weeklyPayment: 287, // Math.ceil((7000 + 1680) / 32) = 272
     dueDate: '2025-05-28',
-    status: 'current',
+    status: 'overdue',
     startDate: '2024-12-01',
     paymentHistory: [
       { date: '2024-12-04', amount: 287, type: 'weekly' },
@@ -214,7 +306,7 @@ export const initialLoans = [
     monthlyInterestRate: 5,
     weeklyPayment: 90, // Math.ceil((1200 + 240) / 16) = 90
     dueDate: '2025-05-28',
-    status: 'current',
+    status: 'overdue',
     startDate: '2025-04-01',
     paymentHistory: [
       { date: '2025-04-02', amount: 90, type: 'weekly' },
@@ -258,7 +350,7 @@ export const initialLoans = [
     monthlyInterestRate: 5,
     weeklyPayment: 240, // Math.ceil((2500 + 375) / 12) = 240
     dueDate: '2025-05-21',
-    status: 'current',
+    status: 'overdue',
     startDate: '2025-04-01',
     paymentHistory: [
       { date: '2025-04-02', amount: 240, type: 'weekly' },
@@ -353,23 +445,6 @@ export const initialLoanRequests = [
   },
   {
     id: 4,
-    memberId: 1,
-    memberName: 'Arteaga',
-    amount: 3500,
-    totalWeeks: 24,
-    purpose: 'Renovación de equipo de trabajo',
-    requestDate: '2025-05-20',
-    requiredDate: '2025-06-05',
-    status: 'pending',
-    monthlyInterestRate: 5,
-    monthlyIncome: 4000,
-    otherDebts: 500,
-    guaranteeOffered: 10000,
-    comments: 'Solicita préstamo para renovar equipos de su taller mecánico',
-    documents: ['dni', 'income_proof', 'business_license']
-  },
-  {
-    id: 5,
     memberId: 2,
     memberName: 'Rossi',
     amount: 1500,
@@ -389,7 +464,7 @@ export const initialLoanRequests = [
     weeklyPayment: 143
   },
   {
-    id: 6,
+    id: 5,
     memberId: 11,
     memberName: 'Alexander',
     amount: 5000,
@@ -406,7 +481,7 @@ export const initialLoanRequests = [
     documents: ['dni', 'income_proof', 'vehicle_quote']
   },
   {
-    id: 7,
+    id: 6,
     memberId: 13,
     memberName: 'Cope',
     amount: 2800,
@@ -423,7 +498,7 @@ export const initialLoanRequests = [
     documents: ['dni', 'income_proof', 'supplier_invoice']
   },
   {
-    id: 8,
+    id: 7,
     memberId: 15,
     memberName: 'Rusbel',
     amount: 1200,
@@ -443,7 +518,7 @@ export const initialLoanRequests = [
     weeklyPayment: 165
   },
   {
-    id: 9,
+    id: 8,
     memberId: 20,
     memberName: 'Chambi',
     amount: 3000,
@@ -460,7 +535,7 @@ export const initialLoanRequests = [
     documents: ['dni', 'income_proof', 'construction_quote']
   },
   {
-    id: 10,
+    id: 9,
     memberId: 27,
     memberName: 'Tito',
     amount: 2200,
@@ -477,7 +552,7 @@ export const initialLoanRequests = [
     documents: ['dni', 'income_proof', 'equipment_quote']
   },
   {
-    id: 11,
+    id: 10,
     memberId: 18,
     memberName: 'Godofredo',
     amount: 1800,
@@ -497,7 +572,7 @@ export const initialLoanRequests = [
     rejectionReason: 'Nivel de endeudamiento excede el 80% de ingresos mensuales'
   },
   {
-    id: 12,
+    id: 11,
     memberId: 31,
     memberName: 'Charapa',
     amount: 4200,
@@ -516,19 +591,43 @@ export const initialLoanRequests = [
 ];
 
 export const generateMockPaymentSchedule = (loanAmount, totalWeeks, monthlyInterestRate, startDate) => {
+  console.log('📋 generateMockPaymentSchedule - Iniciando:', {
+    loanAmount,
+    totalWeeks,
+    monthlyInterestRate,
+    startDate
+  });
+  
   const calculation = calculateLoanPayment(loanAmount, monthlyInterestRate, totalWeeks);
   const schedule = [];
   let remainingBalance = loanAmount;
+  
+  // Para la primera semana, usar la fecha requerida como base
   let currentDate = new Date(startDate);
   
+  console.log('📅 generateMockPaymentSchedule - Fecha de inicio:', {
+    originalStartDate: startDate,
+    parsedCurrentDate: currentDate.toISOString().split('T')[0],
+    dayOfWeek: currentDate.getDay()
+  });
+  
   for (let i = 1; i <= totalWeeks; i++) {
-    // Siguiente miércoles
-    currentDate.setDate(currentDate.getDate() + 7);
-    const wednesdayDate = getNextWednesday(currentDate);
+    // Para la primera iteración, usar el próximo miércoles desde startDate
+    // Para las siguientes, agregar 7 días (una semana) a la fecha anterior
+    let wednesdayDate;
+    if (i === 1) {
+      console.log(`🔄 Semana ${i} - Calculando primer miércoles desde:`, currentDate.toISOString().split('T')[0]);
+      wednesdayDate = getNextWednesday(currentDate);
+    } else {
+      // Agregar exactamente 7 días a la fecha anterior
+      currentDate.setDate(currentDate.getDate() + 7);
+      wednesdayDate = new Date(currentDate);
+      console.log(`🔄 Semana ${i} - Agregando 7 días:`, wednesdayDate.toISOString().split('T')[0]);
+    }
     
     remainingBalance -= calculation.weeklyCapital;
     
-    schedule.push({
+    const payment = {
       week: i,
       dueDate: wednesdayDate.toISOString().split('T')[0],
       weeklyPayment: calculation.weeklyPayment,
@@ -536,10 +635,24 @@ export const generateMockPaymentSchedule = (loanAmount, totalWeeks, monthlyInter
       interestPayment: (calculation.weeklyPayment - calculation.weeklyCapital),
       remainingBalance: Math.max(0, Math.round(remainingBalance * 100) / 100),
       status: 'pending'
-    });
+    };
+    
+    schedule.push(payment);
+    
+    if (i <= 3) {
+      console.log(`✅ Semana ${i} programada:`, {
+        dueDate: payment.dueDate,
+        amount: payment.weeklyPayment,
+        dayOfWeek: wednesdayDate.getDay()
+      });
+    }
     
     currentDate = new Date(wednesdayDate);
   }
+  
+  console.log('🎯 generateMockPaymentSchedule - Cronograma completo (primeras 3 semanas):', 
+    schedule.slice(0, 3).map(p => ({ week: p.week, dueDate: p.dueDate, amount: p.weeklyPayment }))
+  );
   
   return schedule;
 };

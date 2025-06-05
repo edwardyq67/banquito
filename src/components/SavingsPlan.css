@@ -243,3 +243,195 @@
     text-align: center;
   }
 }
+
+/* Nuevos estilos para configuración de monto */
+.amount-config {
+  display: flex;
+  justify-content: center;
+  margin-top: 10px;
+}
+
+.config-btn {
+  background: linear-gradient(135deg, #3b82f6, #1e40af);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.config-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+}
+
+.amount-input-container {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 10px;
+}
+
+.amount-input {
+  width: 200px;
+  padding: 12px 16px;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 18px;
+  font-weight: 600;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.amount-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.input-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.confirm-btn,
+.cancel-btn {
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.confirm-btn {
+  background-color: #10b981;
+  color: white;
+}
+
+.confirm-btn:hover {
+  background-color: #059669;
+  transform: scale(1.1);
+}
+
+.cancel-btn {
+  background-color: #ef4444;
+  color: white;
+}
+
+.cancel-btn:hover {
+  background-color: #dc2626;
+  transform: scale(1.1);
+}
+
+/* Estilos para ahorro activo */
+.active-savings-display {
+  background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+  border: 2px solid #3b82f6;
+  border-radius: 16px;
+  padding: 24px;
+  margin: 20px 0;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+}
+
+.active-savings-display h4 {
+  margin: 0 0 16px 0;
+  color: #1e40af;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.savings-status {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.status-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(59, 130, 246, 0.1);
+}
+
+.status-row:last-child {
+  border-bottom: none;
+}
+
+.status-row span:first-child {
+  color: #64748b;
+  font-weight: 500;
+}
+
+.status-row span:last-child {
+  color: #1e293b;
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.status-row.highlight {
+  background-color: rgba(59, 130, 246, 0.05);
+  padding: 12px;
+  border-radius: 8px;
+  margin-top: 8px;
+  border: none;
+}
+
+.status-row.highlight span:last-child {
+  color: #1e40af;
+  font-size: 20px;
+}
+
+/* Botón iniciar ahorro */
+.start-saving-btn {
+  width: 100%;
+  padding: 16px;
+  margin-top: 20px;
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 18px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.start-saving-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+}
+
+/* Información de fórmula */
+.formula-info {
+  background-color: #eff6ff;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 16px;
+}
+
+.formula-info h5 {
+  margin: 0 0 8px 0;
+  color: #1e40af;
+  font-size: 16px;
+}
+
+.formula-info p {
+  margin: 4px 0;
+  color: #475569;
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './Calendar.css';
 
 const Calendar = ({ loans, members, loanRequests, onUpdateLoan, onUpdateLoanRequest, currentUser }) => {
@@ -8,6 +8,12 @@ const Calendar = ({ loans, members, loanRequests, onUpdateLoan, onUpdateLoanRequ
   const [showDayDetail, setShowDayDetail] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [showEventDetail, setShowEventDetail] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // Forzar actualización cuando cambian las solicitudes
+  useEffect(() => {
+    setRefreshKey(prev => prev + 1);
+  }, [loanRequests]);
 
   const monthNames = [
     'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -48,11 +54,39 @@ const Calendar = ({ loans, members, loanRequests, onUpdateLoan, onUpdateLoanRequ
     if (activeView === 'payments') {
       // Eventos de pagos y vencimientos
       loans.forEach(loan => {
-        // Vencimientos
+        // Vencimientos - Restar 1 día para corregir desfase
         const dueDate = new Date(loan.dueDate);
-        if (dueDate.toISOString().split('T')[0] === dateStr && loan.status !== 'paid') {
+        dueDate.setDate(dueDate.getDate() - 1);
+        const dueDateStr = dueDate.toISOString().split('T')[0];
+        
+        // Debug para préstamos con fechas incorrectas
+        if (loan.memberName === 'edward' || loan.memberName === 'Julia') {
+          console.log('🔍 Calendar Debug - Préstamo:', {
+            memberName: loan.memberName,
+            originalDueDate: loan.dueDate,
+            dueDateStr: dueDateStr,
+            currentDateStr: dateStr,
+            matches: dueDateStr === dateStr,
+            status: loan.status,
+            expectedWednesday: loan.dueDate // Debería ser miércoles
+          });
+        }
+        
+        if (dueDateStr === dateStr && loan.status !== 'paid') {
           const paymentAmount = loan.weeklyPayment || loan.monthlyPayment || 0;
           const currentWeek = loan.currentWeek || loan.currentInstallment || 1;
+          const member = members.find(m => m.id === loan.memberId);
+          
+          // Debug adicional para edward
+          if (loan.memberName === 'edward') {
+            console.log('🎯 Calendar - Edward aparece en fecha:', {
+              dateStr: dateStr,
+              date: new Date(dateStr),
+              dayOfWeek: new Date(dateStr).getDay(),
+              dayName: ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'][new Date(dateStr).getDay()]
+            });
+          }
+          
           events.push({
             type: 'payment',
             title: `${loan.memberName}`,
@@ -60,13 +94,15 @@ const Calendar = ({ loans, members, loanRequests, onUpdateLoan, onUpdateLoanRequ
             amountStr: `S/ ${paymentAmount.toLocaleString()}`,
             detail: `Vencimiento semana #${currentWeek}`,
             memberId: loan.memberId,
-            loanId: loan.id
+            loanId: loan.id,
+            creditRating: member?.creditRating || 'unrated'
           });
         }
 
         // Pagos realizados
         loan.paymentHistory.forEach(payment => {
           if (payment.date === dateStr) {
+            const member = members.find(m => m.id === loan.memberId);
             events.push({
               type: 'payment_made',
               title: `${loan.memberName}`,
@@ -74,7 +110,8 @@ const Calendar = ({ loans, members, loanRequests, onUpdateLoan, onUpdateLoanRequ
               amountStr: `S/ ${payment.amount.toLocaleString()}`,
               detail: 'Pago realizado',
               memberId: loan.memberId,
-              loanId: loan.id
+              loanId: loan.id,
+              creditRating: member?.creditRating || 'unrated'
             });
           }
         });
@@ -97,19 +134,21 @@ const Calendar = ({ loans, members, loanRequests, onUpdateLoan, onUpdateLoanRequ
               requiredDate: request.requiredDate,
               requestDate: request.requestDate
             });
-          } else {
+          } else if (request.status === 'pending') {
+            // Solo mostrar solicitudes pendientes para poder aprobar/rechazar
             events.push({
               type: 'request',
               title: `${request.memberName}`,
               amount: request.amount,
               amountStr: `S/ ${request.amount.toLocaleString()}`,
-              detail: `Solicitud ${request.status}`,
+              detail: `Solicitud pendiente`,
               memberId: request.memberId,
               requestId: request.id,
               requiredDate: request.requiredDate,
               requestDate: request.requestDate
             });
           }
+          // No mostrar solicitudes rechazadas en el calendario
         }
       });
     }
@@ -132,59 +171,128 @@ const Calendar = ({ loans, members, loanRequests, onUpdateLoan, onUpdateLoanRequ
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
 
-    if (activeView === 'payments') {
-      let totalEvents = 0;
-      let totalAmount = 0;
-      let totalPaid = 0;
-      let paymentCount = 0;
+    console.log('📅 Calendar Debug - Calculando estadísticas para:', {
+      year,
+      month: month + 1,
+      firstDay: firstDay.toLocaleDateString(),
+      lastDay: lastDay.toLocaleDateString(),
+      activeView,
+      totalLoans: loans.length,
+      totalRequests: loanRequests.length
+    });
 
+    if (activeView === 'payments') {
+      let vencimientosDelMes = 0;
+      let totalPorCobrar = 0; // Total programado para cobrar en el mes
+      let totalPagosRecibidos = 0; // Total efectivamente recibido en el mes
+      let cantidadPagosRecibidos = 0;
+
+      // Calcular todos los vencimientos programados para este mes
       loans.forEach(loan => {
-        // Vencimientos en el mes
-        const dueDate = new Date(loan.dueDate);
-        if (dueDate >= firstDay && dueDate <= lastDay && loan.status !== 'paid') {
-          totalEvents++;
-          totalAmount += loan.monthlyPayment;
+        // Buscar todos los pagos que vencen en este mes (usando lógica de cronograma semanal)
+        const loanStartDate = new Date(loan.approvedDate || loan.requestDate);
+        const weeklyPayment = loan.weeklyPayment || loan.monthlyPayment || 0;
+        const totalWeeks = loan.totalWeeks || loan.installments || 12;
+
+        // Calcular todas las fechas de vencimiento del préstamo
+        for (let week = 1; week <= totalWeeks; week++) {
+          const paymentDate = new Date(loanStartDate);
+          paymentDate.setDate(paymentDate.getDate() + (week * 7)); // Cada 7 días (semanal)
+          
+          // Si esta fecha de pago está en el mes actual
+          if (paymentDate >= firstDay && paymentDate <= lastDay) {
+            vencimientosDelMes++;
+            totalPorCobrar += weeklyPayment;
+            
+            console.log('💰 Vencimiento programado:', {
+              member: loan.memberName,
+              semana: week,
+              fechaVencimiento: paymentDate.toLocaleDateString(),
+              monto: weeklyPayment
+            });
+          }
         }
 
-        // Pagos realizados en el mes
-        loan.paymentHistory.forEach(payment => {
-          const paymentDate = new Date(payment.date);
-          if (paymentDate >= firstDay && paymentDate <= lastDay) {
-            totalPaid += payment.amount;
-            paymentCount++;
-          }
-        });
+        // Calcular pagos efectivamente recibidos en este mes
+        if (loan.paymentHistory && loan.paymentHistory.length > 0) {
+          loan.paymentHistory.forEach(payment => {
+            const paymentDate = new Date(payment.date);
+            if (paymentDate >= firstDay && paymentDate <= lastDay && payment.amount) {
+              totalPagosRecibidos += payment.amount;
+              cantidadPagosRecibidos++;
+              console.log('✅ Pago recibido:', {
+                member: loan.memberName,
+                fecha: payment.date,
+                monto: payment.amount
+              });
+            }
+          });
+        }
+      });
+
+      console.log('📊 Estadísticas del mes calculadas:', {
+        vencimientosDelMes,
+        totalPorCobrar,
+        totalPagosRecibidos,
+        cantidadPagosRecibidos,
+        pendientePorCobrar: totalPorCobrar - totalPagosRecibidos
       });
 
       return {
-        label1: 'Total Eventos',
-        value1: totalEvents,
-        label2: 'Monto Pendiente',
-        value2: `S/ ${totalAmount.toLocaleString()}`,
-        label3: 'Pagos Realizados',
-        value3: paymentCount,
-        label4: 'Total Cobrado',
-        value4: `S/ ${totalPaid.toLocaleString()}`
+        label1: 'Vencimientos del Mes',
+        value1: vencimientosDelMes,
+        label2: 'Por Cobrar',
+        value2: `S/ ${(totalPorCobrar || 0).toLocaleString()}`,
+        label3: 'Pagos Recibidos',
+        value3: `S/ ${(totalPagosRecibidos || 0).toLocaleString()}`,
+        label4: 'Pendiente por Cobrar',
+        value4: `S/ ${Math.max(0, (totalPorCobrar || 0) - (totalPagosRecibidos || 0)).toLocaleString()}`
       };
     } else {
-      const monthRequests = loanRequests.filter(request => {
-        const requestDate = new Date(request.requestDate);
-        return requestDate >= firstDay && requestDate <= lastDay;
+      // Mostrar estadísticas directas del Panel de Gestión Administrativa
+      // (Todas las solicitudes actuales, no solo del mes)
+      console.log('📝 Analizando solicitudes del Panel Administrativo:', {
+        totalSolicitudes: loanRequests.length,
+        solicitudesDetalle: loanRequests.map(req => ({
+          member: req.memberName,
+          monto: req.amount,
+          estado: req.status,
+          fecha: req.requestDate
+        }))
       });
 
-      const totalAmount = monthRequests.reduce((sum, req) => sum + req.amount, 0);
-      const pendingCount = monthRequests.filter(r => r.status === 'pending').length;
-      const approvedCount = monthRequests.filter(r => r.status === 'approved').length;
+      // Calcular estadísticas globales del Panel Administrativo
+      const totalSolicitudes = loanRequests.length;
+      const montoTotalSolicitado = loanRequests.reduce((sum, req) => sum + (req.amount || 0), 0);
+      const enRevision = loanRequests.filter(r => r.status === 'pending').length;
+      const aprobadas = loanRequests.filter(r => r.status === 'approved').length;
+      const rechazadas = loanRequests.filter(r => r.status === 'rejected').length;
+
+      // Solicitudes del mes actual (para referencia)
+      const solicitudesDelMes = loanRequests.filter(request => {
+        const requestDate = new Date(request.requestDate);
+        return requestDate >= firstDay && requestDate <= lastDay;
+      }).length;
+
+      console.log('📊 Estadísticas del Panel Administrativo:', {
+        totalSolicitudes,
+        solicitudesDelMes,
+        montoTotalSolicitado,
+        enRevision,
+        aprobadas,
+        rechazadas,
+        porcentajeAprobacion: totalSolicitudes > 0 ? ((aprobadas / totalSolicitudes) * 100).toFixed(1) : 0
+      });
 
       return {
         label1: 'Total Solicitudes',
-        value1: monthRequests.length,
-        label2: 'Monto Solicitado',
-        value2: `S/ ${totalAmount.toLocaleString()}`,
-        label3: 'Pendientes',
-        value3: pendingCount,
+        value1: totalSolicitudes,
+        label2: 'Monto Total Solicitado',
+        value2: `S/ ${(montoTotalSolicitado || 0).toLocaleString()}`,
+        label3: 'En Revisión',
+        value3: enRevision,
         label4: 'Aprobadas',
-        value4: approvedCount
+        value4: aprobadas
       };
     }
   };
@@ -212,53 +320,221 @@ const Calendar = ({ loans, members, loanRequests, onUpdateLoan, onUpdateLoanRequ
     setSelectedEvent(null);
   };
 
+  // Función para calcular la fecha del próximo miércoles
+  const getNextWednesday = (date) => {
+    const nextDate = new Date(date);
+    const dayOfWeek = nextDate.getDay(); // 0 = domingo, 3 = miércoles
+    
+    // Si es miércoles, ir al próximo miércoles (7 días después)
+    // Si no es miércoles, ir al próximo miércoles más cercano
+    let daysToAdd;
+    if (dayOfWeek === 3) {
+      // Si es miércoles, ir al próximo miércoles (7 días después)
+      daysToAdd = 7;
+    } else if (dayOfWeek < 3) {
+      // Si es domingo (0), lunes (1) o martes (2), ir al miércoles de la misma semana
+      daysToAdd = 3 - dayOfWeek;
+    } else {
+      // Si es jueves (4), viernes (5) o sábado (6), ir al miércoles de la próxima semana
+      daysToAdd = 7 - dayOfWeek + 3;
+    }
+    
+    nextDate.setDate(nextDate.getDate() + daysToAdd);
+    return nextDate;
+  };
+
+  // Función para calcular semanas de atraso
+  const calculateWeeksLate = (dueDate) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Normalizar a medianoche
+    
+    // Evitar problemas de zona horaria
+    const dueDateStr = dueDate.includes('T') ? 
+      new Date(dueDate).toISOString().split('T')[0] : 
+      dueDate;
+    const due = new Date(dueDateStr + 'T00:00:00');
+    
+    const diffTime = today - due;
+    const diffWeeks = Math.floor(diffTime / (7 * 24 * 60 * 60 * 1000));
+    return Math.max(0, diffWeeks);
+  };
+
   const handleEventAction = async (action, eventData) => {
     try {
       if (action === 'pay') {
         // Registrar pago
         const loan = loans.find(l => l.id === eventData.loanId);
         if (loan && onUpdateLoan) {
-          const updatedLoan = {
-            ...loan,
-            paymentHistory: [
-              ...loan.paymentHistory,
-              {
-                date: new Date().toISOString().split('T')[0],
-                amount: eventData.amount,
-                method: 'Efectivo'
-              }
-            ],
-            currentInstallment: loan.currentInstallment + 1,
-            status: loan.currentInstallment + 1 >= loan.installments ? 'paid' : loan.status
-          };
-          onUpdateLoan(updatedLoan);
+          // Calcular si el pago es puntual o tardío
+          const weeksLate = calculateWeeksLate(loan.dueDate);
+          let scoreChange = 0;
+          let reason = '';
+
+          if (weeksLate === 0) {
+            // Pago puntual: +2 puntos
+            scoreChange = 2;
+            reason = 'Pago puntual';
+          } else if (weeksLate === 1) {
+            // 1 semana de atraso: -5 puntos
+            scoreChange = -5;
+            reason = `Pago con 1 semana de atraso`;
+          } else if (weeksLate >= 2) {
+            // 2+ semanas de atraso: -10 puntos
+            scoreChange = -10;
+            reason = `Pago con ${weeksLate} semanas de atraso`;
+          }
+
+          const newPaymentHistory = [...loan.paymentHistory, {
+            date: new Date().toISOString().split('T')[0],
+            amount: eventData.amount,
+            type: 'payment',
+            weeksLate: weeksLate,
+            scoreChange: scoreChange
+          }];
+
+          const newRemainingAmount = Math.max(0, loan.remainingAmount - eventData.amount);
+          const newCurrentInstallment = eventData.amount >= (loan.weeklyPayment || loan.monthlyPayment) ?
+            loan.currentInstallment + 1 : loan.currentInstallment;
+
+          let newStatus = 'current';
+          if (newRemainingAmount === 0) {
+            newStatus = 'paid';
+          } else {
+            const dueDate = new Date(loan.dueDate);
+            const today = new Date();
+            if (dueDate < today) {
+              newStatus = 'overdue';
+            }
+          }
+
+          // Calcular la próxima fecha de vencimiento desde el cronograma
+          let nextDueDate = loan.dueDate;
+          if (newCurrentInstallment <= (loan.totalWeeks || loan.installments) && loan.paymentSchedule) {
+            // Usar la fecha del cronograma si existe
+            const nextPayment = loan.paymentSchedule[newCurrentInstallment - 1];
+            if (nextPayment) {
+              nextDueDate = nextPayment.dueDate;
+            }
+          } else if (newCurrentInstallment <= (loan.totalWeeks || loan.installments)) {
+            // Fallback: calcular próximo miércoles solo si no hay cronograma
+            const currentDueDate = new Date(loan.dueDate);
+            currentDueDate.setDate(currentDueDate.getDate() + 7);
+            const nextWednesday = getNextWednesday(currentDueDate);
+            nextDueDate = nextWednesday.toISOString().split('T')[0];
+          }
+
+          const updatedLoans = loans.map(l => l.id === loan.id ? {
+            ...l,
+            remainingAmount: newRemainingAmount,
+            currentInstallment: newCurrentInstallment,
+            paymentHistory: newPaymentHistory,
+            status: newStatus,
+            dueDate: nextDueDate
+          } : l);
+
+          onUpdateLoan(updatedLoans);
+          
+          // Nota: En Calendar no podemos actualizar directamente el score de miembros
+          // porque no tenemos acceso a setMembers. Esto debe manejarse en el componente padre.
+          console.log(`📊 Cambio de puntaje sugerido para ${loan.memberName}: ${scoreChange} (${reason})`);
         }
       } else if (action === 'approve_request') {
-        // Aprobar solicitud
+        // Aprobar solicitud y crear préstamo con cronograma específico
         const request = loanRequests.find(r => r.id === eventData.requestId);
-        if (request && onUpdateLoanRequest) {
-          const updatedRequest = {
-            ...request,
-            status: 'approved',
-            approvedDate: new Date().toISOString().split('T')[0]
+        if (request && onUpdateLoanRequest && onUpdateLoan) {
+          // Generar cronograma de pagos usando la fecha requerida
+          const { generateMockPaymentSchedule } = await import('../data/mockDataFinal');
+          const startDate = request.requiredDate || request.requestDate;
+          
+          console.log('🔍 Debug Calendar - Aprobando solicitud:', {
+            memberName: request.memberName,
+            amount: request.amount,
+            requiredDate: request.requiredDate,
+            requestDate: request.requestDate,
+            startDate: startDate
+          });
+          
+          const paymentSchedule = generateMockPaymentSchedule(
+            request.amount,
+            request.totalWeeks || request.installments,
+            request.monthlyInterestRate,
+            startDate
+          );
+
+          console.log('📅 Debug Calendar - Cronograma generado:', {
+            firstPayment: paymentSchedule[0],
+            totalPayments: paymentSchedule.length,
+            allPayments: paymentSchedule.slice(0, 3).map(p => ({ week: p.week, dueDate: p.dueDate }))
+          });
+
+          // La primera fecha de pago viene del cronograma
+          const firstPaymentDate = paymentSchedule[0]?.dueDate || new Date().toISOString().split('T')[0];
+          
+          console.log('✅ Debug Calendar - Primera fecha de pago:', firstPaymentDate);
+
+          // Crear nuevo préstamo con cronograma
+          const newLoan = {
+            id: Date.now(),
+            memberId: request.memberId,
+            memberName: request.memberName,
+            originalAmount: request.amount,
+            remainingAmount: request.amount,
+            installments: request.totalWeeks || request.installments,
+            totalWeeks: request.totalWeeks || request.installments,
+            currentInstallment: 1,
+            currentWeek: 1,
+            interestRate: request.monthlyInterestRate,
+            monthlyPayment: request.weeklyPayment || request.monthlyPayment || 0,
+            weeklyPayment: request.weeklyPayment || request.monthlyPayment || 0,
+            dueDate: firstPaymentDate,
+            status: 'current',
+            paymentHistory: [],
+            paymentSchedule: paymentSchedule, // Agregar cronograma completo
+            approvedDate: new Date().toISOString(),
+            approvedBy: 'admin',
+            purpose: request.purpose,
+            requestDate: request.requestDate
           };
-          onUpdateLoanRequest(updatedRequest);
+
+          // Actualizar préstamos
+          const updatedLoans = [...loans, newLoan];
+          onUpdateLoan(updatedLoans);
+
+          // Marcar la solicitud como aprobada
+          const updatedRequests = loanRequests.map(r => r.id === request.id ? {
+            ...r,
+            status: 'approved',
+            approvedDate: new Date().toISOString().split('T')[0],
+            approvedBy: 'admin'
+          } : r);
+          onUpdateLoanRequest(updatedRequests);
         }
       } else if (action === 'reject_request') {
         // Rechazar solicitud
         const request = loanRequests.find(r => r.id === eventData.requestId);
         if (request && onUpdateLoanRequest) {
-          const updatedRequest = {
-            ...request,
+          const updatedRequests = loanRequests.map(r => r.id === request.id ? {
+            ...r,
             status: 'rejected',
             rejectedDate: new Date().toISOString().split('T')[0],
             rejectionReason: eventData.reason || 'Sin motivo especificado'
-          };
-          onUpdateLoanRequest(updatedRequest);
+          } : r);
+          onUpdateLoanRequest(updatedRequests);
         }
       }
       
+      // Cerrar modales y forzar actualización
       closeEventDetail();
+      if (showDayDetail) {
+        setShowDayDetail(false);
+        setSelectedDate(null);
+      }
+      
+      // Pequeño delay para asegurar que se procese el cambio de estado
+      setTimeout(() => {
+        setRefreshKey(prev => prev + 1);
+      }, 100);
+      
     } catch (error) {
       console.error('Error al procesar la acción:', error);
     }
@@ -283,7 +559,7 @@ const Calendar = ({ loans, members, loanRequests, onUpdateLoan, onUpdateLoanRequ
 
     return (
       <div 
-        key={date.toISOString()} 
+        key={`${date.toISOString()}-${refreshKey}`} 
         className={dayClasses}
         onClick={() => handleDayClick(date)}
       >
@@ -294,7 +570,7 @@ const Calendar = ({ loans, members, loanRequests, onUpdateLoan, onUpdateLoanRequ
             events.slice(0, 2).map((event, index) => (
               <div 
                 key={index} 
-                className={`event-item event-${event.type}`}
+                className={`event-item event-${event.type} ${event.creditRating ? `credit-${event.creditRating}` : ''}`}
                 title={`${event.title} - ${event.amountStr} - ${event.detail}`}
               >
                 {event.title}

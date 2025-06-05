@@ -306,6 +306,31 @@
   border-left: 4px solid #22c55e;
 }
 
+/* Estilos específicos por calificación crediticia */
+.event-payment.credit-green {
+  background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+  color: #14532d;
+  border-left: 4px solid #22c55e;
+}
+
+.event-payment.credit-yellow {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  color: #92400e;
+  border-left: 4px solid #f59e0b;
+}
+
+.event-payment.credit-red {
+  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+  color: #991b1b;
+  border-left: 4px solid #ef4444;
+}
+
+.event-payment.credit-unrated {
+  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+  color: #475569;
+  border-left: 4px solid #94a3b8;
+}
+
 .event-payment::before {
   content: '💰';
   margin-right: 4px;
@@ -320,6 +345,42 @@
 .event-request::before {
   content: '📝';
   margin-right: 4px;
+}
+
+.event-payment_made {
+  background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+  color: #065f46;
+  border-left: 4px solid #10b981;
+}
+
+.event-payment_made::before {
+  content: '✅';
+  margin-right: 4px;
+}
+
+/* Estilos específicos por calificación crediticia para pagos realizados */
+.event-payment_made.credit-green {
+  background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+  color: #065f46;
+  border-left: 4px solid #10b981;
+}
+
+.event-payment_made.credit-yellow {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  color: #92400e;
+  border-left: 4px solid #f59e0b;
+}
+
+.event-payment_made.credit-red {
+  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+  color: #991b1b;
+  border-left: 4px solid #ef4444;
+}
+
+.event-payment_made.credit-unrated {
+  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+  color: #475569;
+  border-left: 4px solid #94a3b8;
 }
 
 .no-events {

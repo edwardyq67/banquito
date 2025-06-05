@@ -253,11 +253,11 @@ const Settings = ({ settings, setSettings, loans = [] }) => {
               </div>
               <div className="calc-row highlight">
                 <span>Recargo por mora (único):</span>
-                <span>S/ {(250 * (tempSettings.delinquencyRate / 100)).toFixed(2)}</span>
+                <span>S/ {Math.ceil(250 * (tempSettings.delinquencyRate / 100))}</span>
               </div>
               <div className="calc-row total">
                 <span><strong>Total a pagar:</strong></span>
-                <span><strong>S/ {(250 + (250 * (tempSettings.delinquencyRate / 100))).toFixed(2)}</strong></span>
+                <span><strong>S/ {Math.ceil(250 + (250 * (tempSettings.delinquencyRate / 100)))}</strong></span>
               </div>
             </div>
           </div>
@@ -268,19 +268,82 @@ const Settings = ({ settings, setSettings, loans = [] }) => {
         <h4>🧮 Simulador de Tasas</h4>
         <div className="simulation-grid">
           <div className="simulation-card">
-            <h5>Préstamo de S/ 7,000</h5>
-            <p>Tasa aplicable: <strong>{tempSettings.monthlyInterestRates.high}% mensual</strong></p>
-            <p>Cuota mensual (12 meses): <strong>S/ {calculateMonthlyPayment(7000, 12, tempSettings.monthlyInterestRates.high).toLocaleString()}</strong></p>
+            <h5>Más de S/ 5,000</h5>
+            <div className="simulation-input">
+              <label>Monto del préstamo:</label>
+              <input
+                type="number"
+                value={tempSettings.simulatorAmounts?.high || 7000}
+                onChange={(e) => {
+                  const value = parseInt(e.target.value) || 5001;
+                  setTempSettings({
+                    ...tempSettings,
+                    simulatorAmounts: {
+                      ...tempSettings.simulatorAmounts,
+                      high: value
+                    }
+                  });
+                  setHasChanges(true);
+                }}
+                min="5001"
+                max="50000"
+                step="100"
+              />
+            </div>
+            <p>Tasa aplicable: <strong>{tempSettings.monthlyInterestRates.high}% semanal</strong></p>
+            <p>Cuota semanal (12 semanal): <strong>S/ {Math.ceil(calculateMonthlyPayment(tempSettings.simulatorAmounts?.high || 7000, 12, tempSettings.monthlyInterestRates.high))}</strong></p>
           </div>
           <div className="simulation-card">
-            <h5>Préstamo de S/ 3,000</h5>
-            <p>Tasa aplicable: <strong>{tempSettings.monthlyInterestRates.medium}% mensual</strong></p>
-            <p>Cuota mensual (12 meses): <strong>S/ {calculateMonthlyPayment(3000, 12, tempSettings.monthlyInterestRates.medium).toLocaleString()}</strong></p>
+            <h5>S/ 1,000 - 5,000</h5>
+            <div className="simulation-input">
+              <label>Monto del préstamo:</label>
+              <input
+                type="number"
+                value={tempSettings.simulatorAmounts?.medium || 3000}
+                onChange={(e) => {
+                  const value = parseInt(e.target.value) || 1001;
+                  setTempSettings({
+                    ...tempSettings,
+                    simulatorAmounts: {
+                      ...tempSettings.simulatorAmounts,
+                      medium: Math.min(4999, Math.max(1001, value))
+                    }
+                  });
+                  setHasChanges(true);
+                }}
+                min="1001"
+                max="4999"
+                step="100"
+              />
+            </div>
+            <p>Tasa aplicable: <strong>{tempSettings.monthlyInterestRates.medium}% semanal</strong></p>
+            <p>Cuota semanal (12 semanal): <strong>S/ {Math.ceil(calculateMonthlyPayment(tempSettings.simulatorAmounts?.medium || 3000, 12, tempSettings.monthlyInterestRates.medium))}</strong></p>
           </div>
           <div className="simulation-card">
-            <h5>Préstamo de S/ 800</h5>
-            <p>Tasa aplicable: <strong>{tempSettings.monthlyInterestRates.low}% mensual</strong></p>
-            <p>Cuota mensual (6 meses): <strong>S/ {calculateMonthlyPayment(800, 6, tempSettings.monthlyInterestRates.low).toLocaleString()}</strong></p>
+            <h5>Menos o igual de S/ 1,000</h5>
+            <div className="simulation-input">
+              <label>Monto del préstamo:</label>
+              <input
+                type="number"
+                value={tempSettings.simulatorAmounts?.low || 800}
+                onChange={(e) => {
+                  const value = parseInt(e.target.value) || 100;
+                  setTempSettings({
+                    ...tempSettings,
+                    simulatorAmounts: {
+                      ...tempSettings.simulatorAmounts,
+                      low: Math.min(1000, Math.max(100, value))
+                    }
+                  });
+                  setHasChanges(true);
+                }}
+                min="100"
+                max="1000"
+                step="50"
+              />
+            </div>
+            <p>Tasa aplicable: <strong>{tempSettings.monthlyInterestRates.low}% semanal</strong></p>
+            <p>Cuota semanal (6 semanal): <strong>S/ {Math.ceil(calculateMonthlyPayment(tempSettings.simulatorAmounts?.low || 800, 6, tempSettings.monthlyInterestRates.low))}</strong></p>
           </div>
         </div>
       </div>
@@ -396,17 +459,6 @@ const Settings = ({ settings, setSettings, loans = [] }) => {
             <option value="dark">🌙 Tema oscuro</option>
             <option value="high-contrast">🔆 Alto contraste</option>
           </select>
-        </div>
-        
-        <div className="logo-upload">
-          <label>Logo personalizado:</label>
-          <div className="upload-area">
-            <input type="file" accept="image/*" style={{ display: 'none' }} id="logo-upload" />
-            <label htmlFor="logo-upload" className="upload-btn">
-              📎 Subir logo
-            </label>
-            <small>Formatos soportados: PNG, JPG (máx. 2MB)</small>
-          </div>
         </div>
       </div>
 

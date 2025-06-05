@@ -8,6 +8,22 @@ const LoansTable = ({ loans, setLoans, members, userRole, calculateLateFee, getP
   const [sortConfig, setSortConfig] = useState({ key: 'dueDate', direction: 'asc' });
   const [selectedLoan, setSelectedLoan] = useState(null);
   const [modalAction, setModalAction] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // Debug: Log loans data whenever it changes
+  React.useEffect(() => {
+    console.log('🔍 LoansTable - Préstamos actualizados:', loans);
+    console.log('📊 Total préstamos:', loans.length);
+    console.log('💰 Monto total pendiente:', loans.reduce((sum, loan) => sum + loan.remainingAmount, 0));
+    
+    // Buscar específicamente préstamos de Arteaga
+    const arteagaLoans = loans.filter(loan => loan.memberName === 'Arteaga');
+    console.log('🎯 Préstamos de Arteaga:', arteagaLoans);
+    console.log('💵 Total original Arteaga:', arteagaLoans.reduce((sum, loan) => sum + loan.originalAmount, 0));
+    console.log('💳 Total pendiente Arteaga:', arteagaLoans.reduce((sum, loan) => sum + loan.remainingAmount, 0));
+    
+    setRefreshKey(prev => prev + 1);
+  }, [loans]);
 
   const getStatusInfo = (loan) => {
     const today = new Date();
@@ -26,28 +42,60 @@ const LoansTable = ({ loans, setLoans, members, userRole, calculateLateFee, getP
   };
 
   const filteredAndSortedLoans = useMemo(() => {
+    // Mostrar cada préstamo individualmente (no agrupar por miembro)
     let filtered = loans.filter(loan => {
       const matchesSearch = loan.memberName.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesStatus = statusFilter === 'all' || 
-        (statusFilter === 'current' && getStatusInfo(loan).class === 'current') ||
-        (statusFilter === 'overdue' && getStatusInfo(loan).class === 'overdue') ||
-        (statusFilter === 'due-soon' && getStatusInfo(loan).class === 'due-soon') ||
-        (statusFilter === 'paid' && getStatusInfo(loan).class === 'paid');
+      
+      let matchesStatus = true;
+      if (statusFilter !== 'all') {
+        const statusInfo = getStatusInfo(loan);
+        if (statusFilter === 'overdue' && statusInfo.class !== 'overdue') matchesStatus = false;
+        if (statusFilter === 'current' && statusInfo.class !== 'current') matchesStatus = false;
+        if (statusFilter === 'paid' && statusInfo.class !== 'paid') matchesStatus = false;
+        if (statusFilter === 'due-soon' && statusInfo.class !== 'due-soon') matchesStatus = false;
+      }
       
       return matchesSearch && matchesStatus;
     });
 
+    // Aplicar ordenamiento
     if (sortConfig.key) {
       filtered.sort((a, b) => {
-        let aValue = a[sortConfig.key];
-        let bValue = b[sortConfig.key];
+        let aValue, bValue;
+        
+        switch(sortConfig.key) {
+          case 'memberName':
+            aValue = a.memberName;
+            bValue = b.memberName;
+            break;
+          case 'originalAmount':
+            aValue = a.originalAmount;
+            bValue = b.originalAmount;
+            break;
+          case 'remainingAmount':
+            aValue = a.remainingAmount;
+            bValue = b.remainingAmount;
+            break;
+          case 'weeklyPayment':
+            aValue = a.weeklyPayment || a.monthlyPayment || 0;
+            bValue = b.weeklyPayment || b.monthlyPayment || 0;
+            break;
+          case 'currentWeek':
+            aValue = a.currentWeek || a.currentInstallment || 1;
+            bValue = b.currentWeek || b.currentInstallment || 1;
+            break;
+          case 'dueDate':
+            aValue = new Date(a.dueDate);
+            bValue = new Date(b.dueDate);
+            break;
+          default:
+            aValue = a[sortConfig.key] || 0;
+            bValue = b[sortConfig.key] || 0;
+        }
 
-        if (sortConfig.key === 'weeklyPayment') {
-          aValue = a.weeklyPayment || a.monthlyPayment;
-          bValue = b.weeklyPayment || b.monthlyPayment;
-        } else if (sortConfig.key === 'dueDate') {
-          aValue = new Date(aValue);
-          bValue = new Date(bValue);
+        if (typeof aValue === 'string') {
+          aValue = aValue.toLowerCase();
+          bValue = bValue.toLowerCase();
         }
 
         if (aValue < bValue) {
@@ -76,11 +124,12 @@ const LoansTable = ({ loans, setLoans, members, userRole, calculateLateFee, getP
   };
 
   const calculateProgress = (loan) => {
+    if (loan.originalAmount === 0) return 0;
     return ((loan.originalAmount - loan.remainingAmount) / loan.originalAmount) * 100;
   };
 
   return (
-    <div className="loans-table-container">
+    <div className="loans-table-container" key={`loans-${refreshKey}-${loans.length}`}>
       <div className="loans-header">
         <h2>💰 {userRole === 'member' ? 'Mis Préstamos' : 'Registro de Deudores'}</h2>
         <div className="loans-summary">
@@ -152,24 +201,23 @@ const LoansTable = ({ loans, setLoans, members, userRole, calculateLateFee, getP
             </tr>
           </thead>
           <tbody>
-            {filteredAndSortedLoans.map(loan => {
+            {filteredAndSortedLoans.map((loan, index) => {
               const statusInfo = getStatusInfo(loan);
               const progress = calculateProgress(loan);
-              const paymentInfo = getPaymentWithLateFee ? getPaymentWithLateFee(loan) : null;
+              const weeklyPayment = loan.weeklyPayment || loan.monthlyPayment || 0;
               
               return (
                 <tr key={loan.id} className={`loan-row ${statusInfo.class}`}>
                   <td className="member-name">
                     <div className="member-info">
                       <span className="name">{loan.memberName}</span>
-                      <span className="id">ID: {loan.memberId}</span>
                     </div>
                   </td>
                   <td className="amount">
-                    S/ {loan.originalAmount.toLocaleString()}
+                    S/ {(loan.originalAmount || 0).toLocaleString()}
                   </td>
                   <td className="amount pending">
-                    S/ {loan.remainingAmount.toLocaleString()}
+                    S/ {(loan.remainingAmount || 0).toLocaleString()}
                   </td>
                   <td className="progress-cell">
                     <div className="progress-container">
@@ -183,32 +231,27 @@ const LoansTable = ({ loans, setLoans, members, userRole, calculateLateFee, getP
                     </div>
                   </td>
                   <td className="installment">
-                    <span className="current">{loan.currentWeek || loan.currentInstallment}</span>
-                    <span className="separator">/</span>
-                    <span className="total">{loan.totalWeeks || loan.installments}</span>
+                    <span className="current-week">
+                      Semana {loan.currentWeek || loan.currentInstallment || 1} / {loan.totalWeeks || loan.installments}
+                    </span>
                   </td>
                   <td className="payment">
                     <div className="payment-details">
-                      <div className="base-payment">S/ {(loan.weeklyPayment || loan.monthlyPayment || 0).toLocaleString()}</div>
-                      {paymentInfo && paymentInfo.lateFee > 0 && (
-                        <div className="total-with-fee">
-                          <strong>S/ {Math.ceil(paymentInfo.totalPayment).toLocaleString()}</strong>
+                      <div className="base-payment">S/ {Math.ceil(weeklyPayment)}</div>
+                      {statusInfo.class === 'overdue' && (
+                        <div className="payment-with-late">
+                          S/ {Math.ceil(weeklyPayment * 1.05)}
                         </div>
                       )}
                     </div>
                   </td>
                   <td className="late-fee">
-                    {paymentInfo ? (
-                      paymentInfo.lateFee > 0 ? (
-                        <div className="fee-details">
-                          <div className="fee-amount">S/ {paymentInfo.lateFee.toLocaleString()}</div>
-                          <div className="fee-status">Vencido</div>
-                        </div>
-                      ) : (
-                        <span className="no-fee">Sin mora</span>
-                      )
+                    {statusInfo.class === 'overdue' ? (
+                      <div className="fee-details">
+                        <div className="fee-amount">S/ {Math.ceil(weeklyPayment * 0.05)}</div>
+                      </div>
                     ) : (
-                      <span className="no-fee">-</span>
+                      <span className="no-fee">Sin mora</span>
                     )}
                   </td>
                   <td className="due-date">
@@ -226,7 +269,7 @@ const LoansTable = ({ loans, setLoans, members, userRole, calculateLateFee, getP
                   <td className="actions">
                     <button 
                       className="action-btn view" 
-                      title="Ver detalles"
+                      title="Ver detalles del préstamo"
                       onClick={() => {
                         setSelectedLoan(loan);
                         setModalAction('details');
@@ -248,7 +291,7 @@ const LoansTable = ({ loans, setLoans, members, userRole, calculateLateFee, getP
                         </button>
                         <button 
                           className="action-btn edit" 
-                          title="Editar"
+                          title="Editar préstamo"
                           onClick={() => {
                             setSelectedLoan(loan);
                             setModalAction('edit');

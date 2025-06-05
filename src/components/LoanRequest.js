@@ -5,6 +5,7 @@ import { generateMockPaymentSchedule, calculateLoanPayment } from '../data/mockD
 const LoanRequest = ({ 
   user, 
   members, 
+  loans,
   settings, 
   getMonthlyInterestRate, 
   calculateAvailableCapital,
@@ -19,6 +20,9 @@ const LoanRequest = ({
   });
   const [calculatedData, setCalculatedData] = useState(null);
   const [showSchedule, setShowSchedule] = useState(false);
+  const [scheduleFilter, setScheduleFilter] = useState('all'); // 'all', 'first4', 'first8', 'last4'
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [submittedRequest, setSubmittedRequest] = useState(null);
 
   const userMember = members.find(member => member.id === user.memberId);
   const availableCapital = calculateAvailableCapital();
@@ -88,16 +92,16 @@ const LoanRequest = ({
     }
 
     const maxLoanAmount = Math.min(
-      settings.loanLimits.individual,
-      userMember.guarantee * (settings.loanLimits.guaranteePercentage / 100)
+      settings?.loanLimits?.individual || 8000,
+      ((userMember?.shares || 0) * (settings?.shareValue || 500)) * ((settings?.loanLimits?.guaranteePercentage || 80) / 100)
     );
 
     if (amount > maxLoanAmount) {
-      errors.push(`El monto excede tu límite de S/ ${maxLoanAmount.toLocaleString()}`);
+      errors.push(`El monto excede tu límite de S/ ${(maxLoanAmount || 0).toLocaleString()}`);
     }
 
     if (amount > availableCapital) {
-      errors.push(`El monto excede el capital disponible de S/ ${availableCapital.toLocaleString()}`);
+      errors.push(`El monto excede el capital disponible de S/ ${(availableCapital || 0).toLocaleString()}`);
     }
 
     if (userMember.creditRating === 'red') {
@@ -150,26 +154,34 @@ const LoanRequest = ({
 
     setLoanRequests(prev => [...prev, newRequest]);
     
-    setFormData({
-      amount: '',
-      installments: '4',
-      purpose: '',
-      requiredDate: ''
-    });
-    setCalculatedData(null);
-    setShowSchedule(false);
-
-    alert('Solicitud enviada exitosamente. Será revisada por el administrador.');
+    // Guardar la solicitud para mostrar en el modal
+    setSubmittedRequest(newRequest);
+    setShowSuccessModal(true);
+    
+    // Limpiar el formulario después de un pequeño delay
+    setTimeout(() => {
+      setFormData({
+        amount: '',
+        installments: '4',
+        purpose: '',
+        requiredDate: ''
+      });
+      setCalculatedData(null);
+      setShowSchedule(false);
+    }, 500);
   };
 
   const generateSchedule = () => {
     if (!calculatedData) return [];
     
+    // Use required date if provided, otherwise use today
+    const startDate = formData.requiredDate || new Date().toISOString();
+    
     return generateMockPaymentSchedule(
       calculatedData.requestedAmount,
       calculatedData.totalWeeks,
       calculatedData.monthlyInterestRate,
-      new Date().toISOString()
+      startDate
     );
   };
 
@@ -184,31 +196,33 @@ const LoanRequest = ({
     );
   }
 
-  const maxLoanAmount = Math.min(
-    settings.loanLimits.individual,
-    userMember.guarantee * (settings.loanLimits.guaranteePercentage / 100)
+  // Calcular el total de préstamos activos del usuario
+  const userActiveLoansTotal = loans ? loans
+    .filter(loan => loan.memberId === user.memberId && loan.status !== 'paid')
+    .reduce((total, loan) => total + loan.remainingAmount, 0) : 0;
+
+  // Calcular el límite base según garantía y configuración
+  const baseLoanLimit = Math.min(
+    settings?.loanLimits?.individual || 8000,
+    ((userMember?.shares || 0) * (settings?.shareValue || 500)) * ((settings?.loanLimits?.guaranteePercentage || 80) / 100)
   );
+
+  // El límite real disponible es el límite base menos los préstamos activos
+  const maxLoanAmount = Math.max(0, baseLoanLimit - userActiveLoansTotal);
 
   return (
     <div className="loan-request-container">
       <div className="request-header">
         <h2>📝 Solicitar Préstamo</h2>
         <div className="member-summary">
-          <div className="member-detail">
-            <span className="label">Miembro:</span>
-            <span className="value">{userMember.name}</span>
-          </div>
-          <div className="member-detail">
-            <span className="label">Calificación:</span>
-            <span className={`credit-rating ${userMember.creditRating}`}>
-              {userMember.creditRating === 'green' && '🟢 Excelente'}
-              {userMember.creditRating === 'yellow' && '🟡 Regular'}
-              {userMember.creditRating === 'red' && '🔴 Observado'}
-            </span>
-          </div>
+          <span className={`credit-rating ${userMember.creditRating}`}>
+            {userMember.creditRating === 'green' && '🟢 Excelente'}
+            {userMember.creditRating === 'yellow' && '🟡 Regular'}
+            {userMember.creditRating === 'red' && '🔴 Observado'}
+          </span>
           <div className="member-detail">
             <span className="label">Límite disponible:</span>
-            <span className="value">S/ {maxLoanAmount.toLocaleString()}</span>
+            <span className="value">S/ {(maxLoanAmount || 0).toLocaleString()}</span>
           </div>
         </div>
       </div>
@@ -231,7 +245,7 @@ const LoanRequest = ({
                 required
               />
               <div className="field-info">
-                Límite máximo: S/ {maxLoanAmount.toLocaleString()}
+                Límite máximo: S/ {(maxLoanAmount || 0).toLocaleString()}
               </div>
             </div>
 
@@ -316,7 +330,7 @@ const LoanRequest = ({
               <div className="calculation-details">
                 <div className="calc-row">
                   <span className="calc-label">Monto solicitado:</span>
-                  <span className="calc-value">S/ {calculatedData.requestedAmount.toLocaleString()}</span>
+                  <span className="calc-value">S/ {(calculatedData?.requestedAmount || 0).toLocaleString()}</span>
                 </div>
                 <div className="calc-row">
                   <span className="calc-label">Tasa de interés:</span>
@@ -328,15 +342,15 @@ const LoanRequest = ({
                 </div>
                 <div className="calc-row highlight">
                   <span className="calc-label">Pago semanal:</span>
-                  <span className="calc-value">S/ {calculatedData.weeklyPayment.toLocaleString()}</span>
+                  <span className="calc-value">S/ {(calculatedData?.weeklyPayment || 0).toLocaleString()}</span>
                 </div>
                 <div className="calc-row">
                   <span className="calc-label">Total a pagar:</span>
-                  <span className="calc-value">S/ {calculatedData.totalAmount.toLocaleString()}</span>
+                  <span className="calc-value">S/ {(calculatedData?.totalAmount || 0).toLocaleString()}</span>
                 </div>
                 <div className="calc-row">
                   <span className="calc-label">Total intereses:</span>
-                  <span className="calc-value">S/ {calculatedData.totalInterest.toLocaleString()}</span>
+                  <span className="calc-value">S/ {(calculatedData?.totalInterest || 0).toLocaleString()}</span>
                 </div>
               </div>
             ) : (
@@ -369,7 +383,47 @@ const LoanRequest = ({
 
       {showSchedule && calculatedData && (
         <div className="schedule-section">
-          <h3>📅 Cronograma de Pagos</h3>
+          <h3>📅 Cronograma de Pagos Semanales</h3>
+          <div className="schedule-info">
+            <p>ℹ️ Primera cuota: <strong>{generateSchedule()[0]?.dueDate ? new Date(generateSchedule()[0].dueDate).toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : 'No disponible'}</strong></p>
+            <p>Los pagos se realizan todos los <strong>miércoles</strong></p>
+          </div>
+          
+          {/* Filtros del cronograma */}
+          <div className="schedule-filters">
+            <label>Mostrar semanas:</label>
+            <div className="filter-buttons">
+              <button 
+                type="button"
+                className={`filter-btn ${scheduleFilter === 'all' ? 'active' : ''}`}
+                onClick={() => setScheduleFilter('all')}
+              >
+                Todas
+              </button>
+              <button 
+                type="button"
+                className={`filter-btn ${scheduleFilter === 'first4' ? 'active' : ''}`}
+                onClick={() => setScheduleFilter('first4')}
+              >
+                Primeras 4
+              </button>
+              <button 
+                type="button"
+                className={`filter-btn ${scheduleFilter === 'first8' ? 'active' : ''}`}
+                onClick={() => setScheduleFilter('first8')}
+              >
+                Primeras 8
+              </button>
+              <button 
+                type="button"
+                className={`filter-btn ${scheduleFilter === 'last4' ? 'active' : ''}`}
+                onClick={() => setScheduleFilter('last4')}
+              >
+                Últimas 4
+              </button>
+            </div>
+          </div>
+          
           <div className="schedule-table-wrapper">
             <table className="schedule-table">
               <thead>
@@ -383,18 +437,50 @@ const LoanRequest = ({
                 </tr>
               </thead>
               <tbody>
-                {generateSchedule().map(payment => (
-                  <tr key={payment.week}>
-                    <td>Semana {payment.week}</td>
-                    <td>{new Date(payment.dueDate).toLocaleDateString('es-ES')}</td>
-                    <td>S/ {payment.weeklyPayment.toLocaleString()}</td>
-                    <td>S/ {payment.capitalPayment.toLocaleString()}</td>
-                    <td>S/ {payment.interestPayment.toLocaleString()}</td>
-                    <td>S/ {payment.remainingBalance.toLocaleString()}</td>
-                  </tr>
-                ))}
+                {(() => {
+                  const schedule = generateSchedule();
+                  let filteredSchedule = schedule;
+                  
+                  if (scheduleFilter === 'first4') {
+                    filteredSchedule = schedule.slice(0, 4);
+                  } else if (scheduleFilter === 'first8') {
+                    filteredSchedule = schedule.slice(0, 8);
+                  } else if (scheduleFilter === 'last4') {
+                    filteredSchedule = schedule.slice(-4);
+                  }
+                  
+                  return filteredSchedule.map(payment => (
+                    <tr key={payment.week} className={payment.week <= 4 ? 'highlight-row' : ''}>
+                      <td>Semana {payment.week}</td>
+                      <td>{new Date(payment.dueDate).toLocaleDateString('es-ES', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' })}</td>
+                      <td>S/ {(payment?.weeklyPayment || 0).toLocaleString()}</td>
+                      <td>S/ {(payment?.capitalPayment || 0).toLocaleString()}</td>
+                      <td>S/ {(payment?.interestPayment || 0).toLocaleString()}</td>
+                      <td>S/ {(payment?.remainingBalance || 0).toLocaleString()}</td>
+                    </tr>
+                  ));
+                })()}
               </tbody>
             </table>
+          </div>
+          
+          {/* Resumen del cronograma filtrado */}
+          <div className="schedule-summary">
+            <div className="summary-item">
+              <span className="summary-label">Mostrando:</span>
+              <span className="summary-value">
+                {scheduleFilter === 'all' && `Todas las ${calculatedData.totalWeeks} semanas`}
+                {scheduleFilter === 'first4' && 'Primeras 4 semanas'}
+                {scheduleFilter === 'first8' && 'Primeras 8 semanas'}
+                {scheduleFilter === 'last4' && 'Últimas 4 semanas'}
+              </span>
+            </div>
+            {scheduleFilter !== 'all' && (
+              <div className="summary-item">
+                <span className="summary-label">Total de semanas:</span>
+                <span className="summary-value">{calculatedData.totalWeeks} semanas</span>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -405,19 +491,91 @@ const LoanRequest = ({
           <div className="capital-details">
             <div className="capital-item">
               <span className="capital-label">Capital disponible:</span>
-              <span className="capital-value">S/ {availableCapital.toLocaleString()}</span>
+              <span className="capital-value">S/ {(availableCapital || 0).toLocaleString()}</span>
             </div>
             <div className="capital-item">
               <span className="capital-label">Tu garantía:</span>
-              <span className="capital-value">S/ {userMember.guarantee.toLocaleString()}</span>
+              <span className="capital-value">S/ {((userMember?.shares || 0) * (settings?.shareValue || 500)).toLocaleString()}</span>
             </div>
             <div className="capital-item">
               <span className="capital-label">Tus acciones:</span>
-              <span className="capital-value">{userMember.shares} acciones</span>
+              <span className="capital-value">{userMember?.shares || 0} acciones</span>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Modal de Éxito */}
+      {showSuccessModal && submittedRequest && (
+        <div className="modal-overlay" onClick={() => setShowSuccessModal(false)}>
+          <div className="success-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header success">
+              <div className="success-icon">✅</div>
+              <h2>¡Solicitud Enviada Exitosamente!</h2>
+            </div>
+            
+            <div className="modal-body">
+              <div className="success-message">
+                <p>Tu solicitud de préstamo ha sido registrada y será revisada por el administrador.</p>
+              </div>
+              
+              <div className="request-summary">
+                <h3>📋 Resumen de tu Solicitud</h3>
+                <div className="summary-details">
+                  <div className="summary-row">
+                    <span className="summary-label">📌 Número de Solicitud:</span>
+                    <span className="summary-value">#{submittedRequest.id}</span>
+                  </div>
+                  <div className="summary-row">
+                    <span className="summary-label">💰 Monto Solicitado:</span>
+                    <span className="summary-value">S/ {submittedRequest.amount.toLocaleString()}</span>
+                  </div>
+                  <div className="summary-row">
+                    <span className="summary-label">📅 Plazo:</span>
+                    <span className="summary-value">{submittedRequest.totalWeeks} semanas</span>
+                  </div>
+                  <div className="summary-row">
+                    <span className="summary-label">💳 Cuota Semanal:</span>
+                    <span className="summary-value">S/ {submittedRequest.weeklyPayment.toLocaleString()}</span>
+                  </div>
+                  <div className="summary-row">
+                    <span className="summary-label">📊 Total a Pagar:</span>
+                    <span className="summary-value">S/ {submittedRequest.totalAmount.toLocaleString()}</span>
+                  </div>
+                  <div className="summary-row">
+                    <span className="summary-label">🎯 Propósito:</span>
+                    <span className="summary-value">{submittedRequest.purpose}</span>
+                  </div>
+                  <div className="summary-row">
+                    <span className="summary-label">📆 Fecha Requerida:</span>
+                    <span className="summary-value">
+                      {new Date(submittedRequest.requiredDate).toLocaleDateString('es-ES')}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="next-steps">
+                <h4>🔄 Próximos Pasos:</h4>
+                <ol>
+                  <li>El administrador revisará tu solicitud en las próximas 24-48 horas</li>
+                  <li>Recibirás una notificación cuando tu solicitud sea procesada</li>
+                  <li>Si es aprobada, el dinero estará disponible en la fecha solicitada</li>
+                </ol>
+              </div>
+              
+              <div className="modal-footer">
+                <button 
+                  className="close-modal-btn"
+                  onClick={() => setShowSuccessModal(false)}
+                >
+                  Entendido
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

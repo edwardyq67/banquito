@@ -8,6 +8,7 @@ import Reports from './Reports';
 import Settings from './Settings';
 import Calendar from './Calendar';
 import SavingsPlan from './SavingsPlan';
+import TestComponent from './TestComponent';
 
 const Dashboard = ({ 
   user, 
@@ -21,9 +22,12 @@ const Dashboard = ({
   setSettings,
   calculateTotalCapital,
   calculateAvailableCapital,
+  getBankingStatistics,
   getMonthlyInterestRate,
   calculateLateFee,
-  getPaymentWithLateFee 
+  getPaymentWithLateFee,
+  users,
+  setUsers 
 }) => {
   const [activeTab, setActiveTab] = useState('dashboard');
 
@@ -70,20 +74,55 @@ const Dashboard = ({
         type: request.status,
         title: request.status === 'approved' ? '✅ Solicitud Aprobada' : '❌ Solicitud Rechazada',
         message: request.status === 'approved' 
-          ? `Tu solicitud de préstamo por S/ ${request.amount.toLocaleString()} ha sido aprobada.`
-          : `Tu solicitud de préstamo por S/ ${request.amount.toLocaleString()} ha sido rechazada.`,
+          ? `Tu solicitud de préstamo por S/ ${(request?.amount || 0).toLocaleString()} ha sido aprobada.`
+          : `Tu solicitud de préstamo por S/ ${(request?.amount || 0).toLocaleString()} ha sido rechazada.`,
         amount: request.amount,
         date: request.status === 'approved' ? request.approvedDate : request.rejectedDate,
         reason: request.rejectionReason || null,
         installments: request.installments,
-        monthlyPayment: request.monthlyPayment
+        monthlyPayment: request.monthlyPayment,
+        weeklyPayment: request.weeklyPayment,
+        totalWeeks: request.totalWeeks
       }))
       .sort((a, b) => new Date(b.date) - new Date(a.date));
   };
 
+  // Función para calcular el próximo miércoles
+  const getNextWednesday = () => {
+    const today = new Date();
+    const dayOfWeek = today.getDay(); // 0 = domingo, 3 = miércoles
+    const daysToAdd = dayOfWeek <= 3 ? 3 - dayOfWeek : 7 - dayOfWeek + 3;
+    const nextWednesday = new Date(today);
+    nextWednesday.setDate(today.getDate() + daysToAdd);
+    return nextWednesday;
+  };
+
+  const getStatusInfo = (loan) => {
+    const today = new Date();
+    const dueDate = new Date(loan.dueDate);
+    const daysDiff = Math.floor((dueDate - today) / (1000 * 60 * 60 * 24));
+
+    if (loan.status === 'paid') {
+      return { label: 'Pagado', class: 'paid', icon: '✅' };
+    } else if (daysDiff < 0) {
+      return { label: `Vencido (${Math.abs(daysDiff)} días)`, class: 'overdue', icon: '🔴' };
+    } else if (daysDiff <= 3) {
+      return { label: `Vence en ${daysDiff} días`, class: 'due-soon', icon: '🟡' };
+    } else {
+      return { label: 'Al día', class: 'current', icon: '🟢' };
+    }
+  };
+
   const renderDashboardContent = () => {
-    const totalCapital = calculateTotalCapital();
-    const availableCapital = calculateAvailableCapital();
+    const bankingStats = getBankingStatistics ? getBankingStatistics() : {
+      totalCapital: calculateTotalCapital(),
+      availableCapital: calculateAvailableCapital(),
+      capitalUtilization: 0,
+      totalShares: 0,
+      memberCount: members.length
+    };
+    const totalCapital = bankingStats.totalCapital;
+    const availableCapital = bankingStats.availableCapital;
     const overdueLoans = getOverdueLoans();
     const upcomingPayments = getUpcomingPayments();
     const userMember = getUserMember();
@@ -116,7 +155,14 @@ const Dashboard = ({
                 <div className="stat-content">
                   <h3>Capital Total</h3>
                   <div className="stat-value">S/ {totalCapital.toLocaleString()}</div>
-                  <div className="stat-subtitle">{members.length} asociados activos</div>
+                  <div className="stat-subtitle">
+                    Base: S/ {bankingStats.baseCapital?.toLocaleString() || '0'}
+                  </div>
+                  <div className="stat-detail">
+                    <div style={{ marginTop: '4px', fontWeight: 'bold', color: '#27ae60' }}>
+                      📈 Rentabilidad: {bankingStats.profitMargin || '0'}%
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -126,7 +172,10 @@ const Dashboard = ({
                   <h3>Capital Disponible</h3>
                   <div className="stat-value">S/ {availableCapital.toLocaleString()}</div>
                   <div className="stat-subtitle">
-                    {((availableCapital / totalCapital) * 100).toFixed(1)}% disponible
+                    {bankingStats.capitalUtilization}% en préstamos
+                  </div>
+                  <div className="stat-detail">
+                    Prestado: S/ {bankingStats.loanedCapital?.toLocaleString() || '0'}
                   </div>
                 </div>
               </div>
@@ -174,8 +223,8 @@ const Dashboard = ({
                 <div className="stat-icon">🏛️</div>
                 <div className="stat-content">
                   <h3>Mi Garantía</h3>
-                  <div className="stat-value">S/ {userMember.guarantee.toLocaleString()}</div>
-                  <div className="stat-subtitle">{userMember.shares} acciones</div>
+                  <div className="stat-value">S/ {((userMember?.shares || 0) * (settings?.shareValue || 500)).toLocaleString()}</div>
+                  <div className="stat-subtitle">{userMember?.shares || 0} acciones</div>
                 </div>
               </div>
 
@@ -183,9 +232,9 @@ const Dashboard = ({
                 <div className="stat-icon">💳</div>
                 <div className="stat-content">
                   <h3>Mis Préstamos</h3>
-                  <div className="stat-value">{userLoans.length}</div>
+                  <div className="stat-value">{userLoans.filter(loan => loan.status !== 'paid').length}</div>
                   <div className="stat-subtitle">
-                    S/ {userLoans.reduce((sum, loan) => sum + loan.remainingAmount, 0).toLocaleString()} pendiente
+                    S/ {userLoans.filter(loan => loan.status !== 'paid').reduce((sum, loan) => sum + loan.remainingAmount, 0).toLocaleString()} pendiente
                   </div>
                 </div>
               </div>
@@ -195,7 +244,12 @@ const Dashboard = ({
                 <div className="stat-content">
                   <h3>Límite Disponible</h3>
                   <div className="stat-value">
-                    S/ {Math.min(settings.loanLimits.individual, userMember.guarantee * 0.8).toLocaleString()}
+                    S/ {Math.max(0, 
+                      Math.min(
+                        settings?.loanLimits?.individual || 8000, 
+                        ((userMember?.shares || 0) * (settings?.shareValue || 500)) * 0.8
+                      ) - userLoans.filter(loan => loan.status !== 'paid').reduce((sum, loan) => sum + loan.remainingAmount, 0)
+                    ).toLocaleString()}
                   </div>
                   <div className="stat-subtitle">límite de préstamo</div>
                 </div>
@@ -272,27 +326,70 @@ const Dashboard = ({
               <h3>💳 Mis Préstamos Activos</h3>
               {userLoans.length > 0 ? (
                 <div className="loans-summary">
-                  {userLoans.map(loan => (
-                    <div key={loan.id} className="loan-summary-item">
-                      <div className="loan-amount">S/ {loan.originalAmount.toLocaleString()}</div>
-                      <div className="loan-progress">
-                        <div className="progress-bar">
-                          <div 
-                            className="progress-fill" 
-                            style={{ 
-                              width: `${((loan.originalAmount - loan.remainingAmount) / loan.originalAmount) * 100}%` 
-                            }}
-                          ></div>
+                  {userLoans.map(loan => {
+                    const progress = ((loan.originalAmount - loan.remainingAmount) / loan.originalAmount) * 100;
+                    const statusInfo = getStatusInfo(loan);
+                    const weeklyPayment = loan.weeklyPayment || loan.monthlyPayment || 0;
+                    
+                    return (
+                      <div key={loan.id} className="loan-summary-item">
+                        <div className="loan-header">
+                          <div className="loan-amount">
+                            <span className="label">Monto original:</span>
+                            <span className="value">S/ {(loan?.originalAmount || 0).toLocaleString()}</span>
+                          </div>
+                          <div className={`status-indicator ${statusInfo.class}`}>
+                            {statusInfo.icon} {statusInfo.label}
+                          </div>
                         </div>
-                        <div className="progress-text">
-                          {loan.currentWeek || loan.currentInstallment}/{loan.totalWeeks || loan.installments} semanas
+                        
+                        <div className="loan-details">
+                          <div className="detail-row">
+                            <span className="label">Saldo pendiente:</span>
+                            <span className="value">S/ {(loan?.remainingAmount || 0).toLocaleString()}</span>
+                          </div>
+                          <div className="detail-row">
+                            <span className="label">Pago semanal:</span>
+                            <span className="value">S/ {Math.ceil(weeklyPayment)}</span>
+                          </div>
+                          {statusInfo.class === 'overdue' && (
+                            <div className="detail-row overdue">
+                              <span className="label">Total con mora:</span>
+                              <span className="value">S/ {Math.ceil(weeklyPayment * 1.05)}</span>
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="loan-progress">
+                          <div className="progress-bar">
+                            <div 
+                              className="progress-fill" 
+                              style={{ width: `${progress}%` }}
+                            ></div>
+                          </div>
+                          <div className="progress-info">
+                            <span className="progress-text">{progress.toFixed(1)}% pagado</span>
+                            <span className="weeks-text">
+                              Semana {loan.currentWeek || loan.currentInstallment} de {loan.totalWeeks || loan.installments}
+                            </span>
+                          </div>
+                        </div>
+                        
+                        <div className="next-payment-info">
+                          <div className="payment-date">
+                            <span className="label">Próximo pago: </span>
+                            <span className="value">
+                              {getNextWednesday().toLocaleDateString('es-ES', { 
+                                weekday: 'long', 
+                                day: 'numeric', 
+                                month: 'long' 
+                              })}
+                            </span>
+                          </div>
                         </div>
                       </div>
-                      <div className="next-payment">
-                        Próximo pago: {new Date(loan.dueDate).toLocaleDateString('es-ES')}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="no-data">No tienes préstamos activos</div>
@@ -318,7 +415,7 @@ const Dashboard = ({
                           <div className="notification-details">
                             <div className="detail-item">
                               <span className="detail-label">💰 Monto:</span>
-                              <span className="detail-value">S/ {notification.amount.toLocaleString()}</span>
+                              <span className="detail-value">S/ {(notification.amount || 0).toLocaleString()}</span>
                             </div>
                             <div className="detail-item">
                               <span className="detail-label">📅 Plazo:</span>
@@ -397,6 +494,7 @@ const Dashboard = ({
         return <LoanRequest 
           user={user}
           members={members}
+          loans={loans}
           settings={settings}
           getMonthlyInterestRate={getMonthlyInterestRate}
           calculateAvailableCapital={calculateAvailableCapital}
@@ -404,7 +502,13 @@ const Dashboard = ({
           setLoanRequests={setLoanRequests}
         />;
       case 'members':
-        return <MembersTable members={members} setMembers={setMembers} />;
+        return <MembersTable 
+          members={members} 
+          setMembers={setMembers} 
+          settings={settings}
+          users={users}
+          setUsers={setUsers}
+        />;
       case 'admin':
         return <AdminPanel 
           loanRequests={loanRequests}
@@ -423,13 +527,19 @@ const Dashboard = ({
           loans={loans} 
           members={members} 
           loanRequests={loanRequests}
+          onUpdateLoan={setLoans}
+          onUpdateLoanRequest={setLoanRequests}
           currentUser={user}
         />;
       case 'savings':
         if (user.role === 'member' && userMember) {
           return <SavingsPlan 
-            guarantee={userMember.guarantee} 
-            memberName={userMember.name} 
+            memberName={userMember.name}
+            memberId={user.memberId}
+            onSavingsUpdate={(savingsData) => {
+              console.log('Nuevo plan de ahorro:', savingsData);
+              // Aquí se podría guardar en el estado si es necesario
+            }}
           />;
         }
         return renderDashboardContent();

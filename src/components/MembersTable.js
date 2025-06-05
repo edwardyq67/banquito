@@ -2,13 +2,23 @@ import React, { useState } from 'react';
 import './MembersTable.css';
 import SavingsPlan from './SavingsPlan';
 
-const MembersTable = ({ members, setMembers }) => {
+const MembersTable = ({ members, setMembers, settings, users, setUsers }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [ratingFilter, setRatingFilter] = useState('all');
   const [sortConfig, setSortConfig] = useState({ key: 'name', direction: 'asc' });
   const [editingMember, setEditingMember] = useState(null);
   const [viewingMember, setViewingMember] = useState(null);
   const [viewingSavingsPlan, setViewingSavingsPlan] = useState(null);
+  const [showAddMemberModal, setShowAddMemberModal] = useState(false);
+  const [newMember, setNewMember] = useState({
+    name: '',
+    dni: '',
+    shares: 10,
+    phone: '',
+    email: '',
+    username: '',
+    password: ''
+  });
 
   const getCreditRatingInfo = (rating) => {
     switch(rating) {
@@ -80,14 +90,214 @@ const MembersTable = ({ members, setMembers }) => {
     setEditingMember(null);
   };
 
+  const handleAddMember = () => {
+    // Validaciones básicas
+    if (!newMember.name || !newMember.dni || !newMember.username || !newMember.password) {
+      alert('Por favor complete todos los campos requeridos');
+      return;
+    }
+
+    // Verificar que el DNI no exista
+    if (members.find(m => m.dni === newMember.dni)) {
+      alert('Ya existe un miembro con este DNI');
+      return;
+    }
+
+    // Verificar que el username no exista
+    if (users.find(u => u.username === newMember.username)) {
+      alert('Ya existe un usuario con este nombre de usuario');
+      return;
+    }
+
+    // Generar nuevo ID para el miembro
+    const newMemberId = Math.max(...members.map(m => m.id), 0) + 1;
+    
+    // Crear nuevo miembro
+    const memberToAdd = {
+      id: newMemberId,
+      name: newMember.name,
+      dni: newMember.dni,
+      shares: newMember.shares || 10,
+      phone: newMember.phone,
+      email: newMember.email,
+      creditRating: 'green',
+      creditScore: 90, // Nuevo miembro empieza con puntaje excelente
+      savingsPlan: {
+        enabled: true,
+        planDays: 180,
+        startDate: new Date().toISOString().split('T')[0],
+        TEA: 0.02
+      }
+    };
+
+    // Crear nuevo usuario asociado
+    const newUserId = Math.max(...users.map(u => u.id), 0) + 1;
+    const userToAdd = {
+      id: newUserId,
+      username: newMember.username,
+      password: newMember.password,
+      role: 'member',
+      name: newMember.name,
+      memberId: newMemberId
+    };
+
+    // Actualizar los estados
+    setMembers([...members, memberToAdd]);
+    setUsers([...users, userToAdd]);
+
+    // Limpiar formulario y cerrar modal
+    setNewMember({
+      name: '',
+      dni: '',
+      shares: 10,
+      phone: '',
+      email: '',
+      username: '',
+      password: ''
+    });
+    setShowAddMemberModal(false);
+
+    alert(`Miembro y usuario creados exitosamente\nUsuario: ${newMember.username}\nContraseña: ${newMember.password}`);
+  };
+
+  const handleCancelAddMember = () => {
+    setNewMember({
+      name: '',
+      dni: '',
+      shares: 10,
+      phone: '',
+      email: '',
+      username: '',
+      password: ''
+    });
+    setShowAddMemberModal(false);
+  };
+
+  const handleDeleteUser = (memberId, memberName) => {
+    const userToDelete = users?.find(u => u.memberId === memberId);
+    
+    if (!userToDelete) {
+      alert('No se encontró un usuario asociado a este miembro.');
+      return;
+    }
+
+    if (userToDelete.role === 'admin') {
+      alert('No se puede eliminar un usuario administrador.');
+      return;
+    }
+
+    const confirmation = window.confirm(
+      `¿Estás seguro de que deseas eliminar el usuario "${userToDelete.username}" asociado a ${memberName}?\n\n` +
+      `Esta acción eliminará el acceso al sistema pero el miembro seguirá existiendo.\n\n` +
+      `Esta acción NO se puede deshacer.`
+    );
+
+    if (confirmation) {
+      const updatedUsers = users.filter(u => u.id !== userToDelete.id);
+      setUsers(updatedUsers);
+      alert(`Usuario "${userToDelete.username}" eliminado exitosamente.\n${memberName} ya no podrá acceder al sistema.`);
+    }
+  };
+
   const updateCreditRating = (memberId, newRating) => {
+    // Calcular nuevo puntaje crediticio basado en la evaluación
+    const getScoreFromRating = (rating) => {
+      switch(rating) {
+        case 'green': return Math.floor(Math.random() * 21) + 70; // 70-90 (Verde/Excelente)
+        case 'yellow': return Math.floor(Math.random() * 30) + 40; // 40-69 (Amarillo/Regular)
+        case 'red': return Math.floor(Math.random() * 40); // 0-39 (Rojo/Riesgo)
+        default: return 90;
+      }
+    };
+
+    const newCreditScore = getScoreFromRating(newRating);
+
     setMembers(prev => prev.map(member => 
-      member.id === memberId ? { ...member, creditRating: newRating } : member
+      member.id === memberId ? { 
+        ...member, 
+        creditRating: newRating,
+        creditScore: newCreditScore
+      } : member
     ));
   };
 
   const calculateTotalGuarantee = () => {
-    return members.reduce((total, member) => total + member.guarantee, 0);
+    return members.reduce((total, member) => total + (member.shares * (settings?.shareValue || 500)), 0);
+  };
+
+  const handleBuyShares = (memberId) => {
+    const member = members.find(m => m.id === memberId);
+    if (!member) return;
+
+    const sharesStr = prompt(
+      `${member.name} tiene actualmente ${member.shares} acciones.\n\n` +
+      `Valor por acción: S/ ${settings?.shareValue || 500}\n\n` +
+      `¿Cuántas acciones adicionales desea comprar?`
+    );
+
+    if (sharesStr === null) return;
+
+    const additionalShares = parseInt(sharesStr);
+    if (isNaN(additionalShares) || additionalShares <= 0) {
+      alert('Por favor ingrese un número válido de acciones.');
+      return;
+    }
+
+    const totalCost = additionalShares * (settings?.shareValue || 500);
+    const confirm = window.confirm(
+      `Confirmar compra de acciones:\n\n` +
+      `Miembro: ${member.name}\n` +
+      `Acciones a comprar: ${additionalShares}\n` +
+      `Costo total: S/ ${totalCost.toLocaleString()}\n` +
+      `Acciones actuales: ${member.shares}\n` +
+      `Acciones después de la compra: ${member.shares + additionalShares}\n\n` +
+      `¿Desea continuar?`
+    );
+
+    if (confirm) {
+      setMembers(prev => prev.map(m => 
+        m.id === memberId 
+          ? { ...m, shares: m.shares + additionalShares }
+          : m
+      ));
+      alert(`✅ Compra exitosa!\n${member.name} ahora tiene ${member.shares + additionalShares} acciones.`);
+    }
+  };
+
+  // Calcular garantía dinámica basada en acciones
+  const calculateGuarantee = (member) => {
+    return member.shares * (settings?.shareValue || 500);
+  };
+
+  const handleCreditRatingChange = (memberId, newRating) => {
+    // Calcular nuevo puntaje crediticio basado en la evaluación
+    const getScoreFromRating = (rating) => {
+      switch(rating) {
+        case 'green': return Math.floor(Math.random() * 30) + 61; // 61-90
+        case 'yellow': return Math.floor(Math.random() * 30) + 31; // 31-60
+        case 'red': return Math.floor(Math.random() * 30) + 1; // 1-30
+        default: return 50;
+      }
+    };
+
+    const newCreditScore = getScoreFromRating(newRating);
+
+    setMembers(members.map(member => 
+      member.id === memberId ? { 
+        ...member, 
+        creditRating: newRating,
+        creditScore: newCreditScore
+      } : member
+    ));
+
+    // Actualizar también el miembro que se está viendo
+    if (viewingMember && viewingMember.id === memberId) {
+      setViewingMember(prev => ({
+        ...prev,
+        creditRating: newRating,
+        creditScore: newCreditScore
+      }));
+    }
   };
 
   const getRatingCounts = () => {
@@ -163,6 +373,16 @@ const MembersTable = ({ members, setMembers }) => {
             <option value="red">🔴 Observado</option>
           </select>
         </div>
+
+        <div className="add-member-section">
+          <button 
+            className="add-member-btn"
+            onClick={() => setShowAddMemberModal(true)}
+            title="Agregar nuevo miembro"
+          >
+            👤➕ Agregar Miembro
+          </button>
+        </div>
       </div>
 
       <div className="table-wrapper">
@@ -190,7 +410,8 @@ const MembersTable = ({ members, setMembers }) => {
           <tbody>
             {filteredAndSortedMembers.map(member => {
               const ratingInfo = getCreditRatingInfo(member.creditRating);
-              const loanLimit = Math.min(8000, member.guarantee * 0.8);
+              const dynamicGuarantee = calculateGuarantee(member);
+              const loanLimit = Math.min(settings?.loanLimits?.individual || 8000, dynamicGuarantee * 0.8);
               
               return (
                 <tr key={member.id} className={`member-row ${ratingInfo.class}`}>
@@ -210,7 +431,7 @@ const MembersTable = ({ members, setMembers }) => {
                     </div>
                   </td>
                   <td className="guarantee">
-                    S/ {member.guarantee.toLocaleString()}
+                    S/ {dynamicGuarantee.toLocaleString()}
                   </td>
                   <td className="credit-rating">
                     <div className="rating-display">
@@ -276,6 +497,15 @@ const MembersTable = ({ members, setMembers }) => {
                     >
                       💰
                     </button>
+                    {users?.find(u => u.memberId === member.id) && (
+                      <button 
+                        className="action-btn delete-user" 
+                        onClick={() => handleDeleteUser(member.id, member.name)}
+                        title="Eliminar usuario del sistema"
+                      >
+                        🗑️
+                      </button>
+                    )}
                   </td>
                 </tr>
               );
@@ -357,15 +587,31 @@ const MembersTable = ({ members, setMembers }) => {
               </div>
               
               <div className="form-group">
-                <label>Calificación Crediticia:</label>
-                <select
-                  value={editingMember.creditRating}
-                  onChange={(e) => setEditingMember(prev => ({...prev, creditRating: e.target.value}))}
-                >
-                  <option value="green">🟢 Excelente</option>
-                  <option value="yellow">🟡 Regular</option>
-                  <option value="red">🔴 Observado</option>
-                </select>
+                <label>Puntaje Crediticio (0-90):</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="90"
+                  value={editingMember.creditScore || 90}
+                  onChange={(e) => {
+                    const score = parseInt(e.target.value) || 0;
+                    const clampedScore = Math.max(0, Math.min(90, score));
+                    let newRating = 'red';
+                    if (clampedScore >= 70) newRating = 'green';
+                    else if (clampedScore >= 40) newRating = 'yellow';
+                    
+                    setEditingMember(prev => ({
+                      ...prev, 
+                      creditScore: clampedScore,
+                      creditRating: newRating
+                    }));
+                  }}
+                />
+                <small className="score-indicator">
+                  {editingMember.creditScore >= 70 && '🟢 Excelente (70-90)'}
+                  {editingMember.creditScore >= 40 && editingMember.creditScore < 70 && '🟡 Regular (40-69)'}
+                  {editingMember.creditScore < 40 && '🔴 Riesgo (0-39)'}
+                </small>
               </div>
             </div>
             
@@ -424,6 +670,87 @@ const MembersTable = ({ members, setMembers }) => {
                 </div>
               </div>
 
+              {/* Credenciales de Acceso */}
+              {(() => {
+                const memberUser = users?.find(u => u.memberId === viewingMember.id);
+                return memberUser ? (
+                  <div className="info-section">
+                    <div className="section-header">
+                      <div className="section-icon">🔐</div>
+                      <h3>Credenciales de Acceso al Sistema</h3>
+                    </div>
+                    <div className="credentials-grid">
+                      <div className="credential-card">
+                        <div className="credential-label">Usuario</div>
+                        <div className="credential-value">
+                          <span className="credential-text">{memberUser.username}</span>
+                          <button 
+                            className="copy-btn"
+                            onClick={() => {
+                              navigator.clipboard.writeText(memberUser.username);
+                              alert('Usuario copiado al portapapeles');
+                            }}
+                            title="Copiar usuario"
+                          >
+                            📋
+                          </button>
+                        </div>
+                      </div>
+                      <div className="credential-card">
+                        <div className="credential-label">Contraseña</div>
+                        <div className="credential-value">
+                          <span className="credential-text">{memberUser.password}</span>
+                          <button 
+                            className="copy-btn"
+                            onClick={() => {
+                              navigator.clipboard.writeText(memberUser.password);
+                              alert('Contraseña copiada al portapapeles');
+                            }}
+                            title="Copiar contraseña"
+                          >
+                            📋
+                          </button>
+                        </div>
+                      </div>
+                      <div className="credential-card full-width">
+                        <div className="credential-label">Acceso Completo</div>
+                        <div className="credential-value">
+                          <span className="credential-text">{memberUser.username} / {memberUser.password}</span>
+                          <button 
+                            className="copy-btn"
+                            onClick={() => {
+                              navigator.clipboard.writeText(`${memberUser.username} / ${memberUser.password}`);
+                              alert('Credenciales completas copiadas al portapapeles');
+                            }}
+                            title="Copiar usuario y contraseña"
+                          >
+                            📋
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="credentials-note">
+                      <span className="note-icon">💡</span>
+                      <span className="note-text">
+                        Estas credenciales permiten al miembro acceder al sistema. 
+                        Se recomienda que el usuario cambie su contraseña después del primer acceso.
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="info-section">
+                    <div className="section-header">
+                      <div className="section-icon">⚠️</div>
+                      <h3>Credenciales de Acceso</h3>
+                    </div>
+                    <div className="no-credentials">
+                      <p>Este miembro no tiene credenciales de acceso al sistema.</p>
+                      <p>Se recomienda crear un usuario asociado para que pueda acceder al sistema.</p>
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Información Financiera */}
               <div className="info-section">
                 <div className="section-header">
@@ -434,17 +761,17 @@ const MembersTable = ({ members, setMembers }) => {
                   <div className="info-card highlight">
                     <div className="info-label">Acciones</div>
                     <div className="info-value big">{viewingMember.shares}</div>
-                    <div className="info-subtitle">S/ {(viewingMember.shares * 500).toLocaleString()} total</div>
+                    <div className="info-subtitle">S/ {(viewingMember.shares * (settings?.shareValue || 500)).toLocaleString()} total</div>
                   </div>
                   <div className="info-card highlight">
                     <div className="info-label">Garantía</div>
-                    <div className="info-value big">S/ {viewingMember.guarantee.toLocaleString()}</div>
+                    <div className="info-value big">S/ {calculateGuarantee(viewingMember).toLocaleString()}</div>
                     <div className="info-subtitle">Monto respaldado</div>
                   </div>
                   <div className="info-card highlight">
                     <div className="info-label">Límite de Préstamo</div>
-                    <div className="info-value big">S/ {Math.min(8000, viewingMember.guarantee * 0.8).toLocaleString()}</div>
-                    <div className="info-subtitle">80% de garantía</div>
+                    <div className="info-value big">S/ {Math.min(settings?.loanLimits?.individual || 8000, calculateGuarantee(viewingMember) * 0.8).toLocaleString()}</div>
+                    <div className="info-subtitle">80% de garantía (máx. S/ {(settings?.loanLimits?.individual || 8000).toLocaleString()})</div>
                   </div>
                 </div>
               </div>
@@ -460,6 +787,18 @@ const MembersTable = ({ members, setMembers }) => {
                     <div className={`rating-circle ${getCreditRatingInfo(viewingMember.creditRating).class}`}>
                       <div className="rating-icon">{getCreditRatingInfo(viewingMember.creditRating).icon}</div>
                       <div className="rating-label">{getCreditRatingInfo(viewingMember.creditRating).label}</div>
+                    </div>
+                    <div className="rating-controls">
+                      <label>Cambiar Evaluación:</label>
+                      <select 
+                        value={viewingMember.creditRating} 
+                        onChange={(e) => handleCreditRatingChange(viewingMember.id, e.target.value)}
+                        className="rating-select"
+                      >
+                        <option value="green">🟢 Excelente</option>
+                        <option value="yellow">🟡 Regular</option>
+                        <option value="red">🔴 Observado</option>
+                      </select>
                     </div>
                     <div className="credit-score-info">
                       <div className="score-label">Puntaje Crediticio</div>
@@ -538,9 +877,133 @@ const MembersTable = ({ members, setMembers }) => {
             </div>
             <div className="modal-content">
               <SavingsPlan 
-                guarantee={viewingSavingsPlan.guarantee} 
+                guarantee={calculateGuarantee(viewingSavingsPlan)} 
                 memberName={viewingSavingsPlan.name}
               />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAddMemberModal && (
+        <div className="edit-modal-overlay">
+          <div className="edit-modal">
+            <div className="modal-header">
+              <h3>👤➕ Agregar Nuevo Miembro</h3>
+              <button className="close-btn" onClick={handleCancelAddMember}>❌</button>
+            </div>
+            
+            <div className="modal-content">
+              <div className="form-section">
+                <h4>📋 Información Personal</h4>
+                <div className="form-group">
+                  <label>Nombre Completo *:</label>
+                  <input
+                    type="text"
+                    value={newMember.name}
+                    onChange={(e) => setNewMember(prev => ({...prev, name: e.target.value}))}
+                    placeholder="Nombre completo del miembro"
+                  />
+                </div>
+                
+                <div className="form-group">
+                  <label>DNI *:</label>
+                  <input
+                    type="text"
+                    value={newMember.dni}
+                    onChange={(e) => setNewMember(prev => ({...prev, dni: e.target.value}))}
+                    maxLength="8"
+                    placeholder="12345678"
+                  />
+                </div>
+                
+                <div className="form-group">
+                  <label>Teléfono:</label>
+                  <input
+                    type="text"
+                    value={newMember.phone}
+                    onChange={(e) => setNewMember(prev => ({...prev, phone: e.target.value}))}
+                    placeholder="987654321"
+                  />
+                </div>
+                
+                <div className="form-group">
+                  <label>Email:</label>
+                  <input
+                    type="email"
+                    value={newMember.email}
+                    onChange={(e) => setNewMember(prev => ({...prev, email: e.target.value}))}
+                    placeholder="email@ejemplo.com"
+                  />
+                </div>
+              </div>
+
+              <div className="form-section">
+                <h4>💰 Información Financiera</h4>
+                <div className="form-group">
+                  <label>Acciones Iniciales:</label>
+                  <input
+                    type="number"
+                    value={newMember.shares}
+                    onChange={(e) => setNewMember(prev => ({...prev, shares: parseInt(e.target.value) || 10}))}
+                    min="1"
+                    placeholder="10"
+                  />
+                  <small>Valor por acción: S/ {(settings?.shareValue || 500).toLocaleString()}</small>
+                </div>
+              </div>
+
+              <div className="form-section">
+                <h4>🔐 Credenciales de Acceso</h4>
+                <div className="form-group">
+                  <label>Nombre de Usuario *:</label>
+                  <input
+                    type="text"
+                    value={newMember.username}
+                    onChange={(e) => setNewMember(prev => ({...prev, username: e.target.value.toLowerCase()}))}
+                    placeholder="usuario123"
+                  />
+                  <small>Solo letras minúsculas y números, sin espacios</small>
+                </div>
+                
+                <div className="form-group">
+                  <label>Contraseña *:</label>
+                  <input
+                    type="text"
+                    value={newMember.password}
+                    onChange={(e) => setNewMember(prev => ({...prev, password: e.target.value}))}
+                    placeholder="contraseña123"
+                  />
+                  <small>El usuario podrá cambiar su contraseña después</small>
+                </div>
+              </div>
+
+              <div className="member-preview">
+                <h4>📊 Resumen del Nuevo Miembro</h4>
+                <div className="preview-grid">
+                  <div className="preview-item">
+                    <span>Garantía inicial:</span>
+                    <span>S/ {((newMember.shares || 10) * (settings?.shareValue || 500)).toLocaleString()}</span>
+                  </div>
+                  <div className="preview-item">
+                    <span>Límite de préstamo:</span>
+                    <span>S/ {Math.min(settings?.loanLimits?.individual || 8000, ((newMember.shares || 10) * (settings?.shareValue || 500)) * 0.8).toLocaleString()}</span>
+                  </div>
+                  <div className="preview-item">
+                    <span>Calificación inicial:</span>
+                    <span>🟢 Excelente (90/90)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="modal-actions">
+              <button className="save-btn" onClick={handleAddMember}>
+                👤➕ Crear Miembro y Usuario
+              </button>
+              <button className="cancel-btn" onClick={handleCancelAddMember}>
+                ❌ Cancelar
+              </button>
             </div>
           </div>
         </div>
