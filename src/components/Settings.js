@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import './Settings.css';
 
-const Settings = ({ settings, setSettings, loans = [] }) => {
+const Settings = ({ settings, setSettings, loans = [], darkMode, setDarkMode }) => {
   const [activeSection, setActiveSection] = useState('general');
   const [tempSettings, setTempSettings] = useState(settings);
   const [hasChanges, setHasChanges] = useState(false);
@@ -61,7 +61,7 @@ const Settings = ({ settings, setSettings, loans = [] }) => {
     <div className="settings-section">
       <h3>⚙️ Configuración General</h3>
       
-      <div className="setting-group">
+      <div className={`setting-group ${darkMode ? 'dark' : ''}`}>
         <h4>💰 Valor de Acciones</h4>
         <div className="setting-item">
           <label htmlFor="shareValue">Valor por acción (S/):</label>
@@ -78,7 +78,7 @@ const Settings = ({ settings, setSettings, loans = [] }) => {
         </div>
       </div>
 
-      <div className="setting-group">
+      <div className={`setting-group ${darkMode ? 'dark' : ''}`}>
         <h4>📅 Día de Operaciones</h4>
         <div className="setting-item">
           <label htmlFor="operationDay">Día de la semana:</label>
@@ -98,7 +98,7 @@ const Settings = ({ settings, setSettings, loans = [] }) => {
         </div>
       </div>
 
-      <div className="setting-group">
+      <div className={`setting-group ${darkMode ? 'dark' : ''}`}>
         <h4>🏛️ Límites de Préstamo</h4>
         <div className="setting-item">
           <label htmlFor="individualLimit">Límite individual máximo (S/):</label>
@@ -139,11 +139,11 @@ const Settings = ({ settings, setSettings, loans = [] }) => {
         <div className="info-card">
           <h4>ℹ️ Información sobre Tasas</h4>
           <p>Las tasas de interés se aplican según el monto del préstamo solicitado. 
-             Las tasas son anuales y se calculan automáticamente en las cuotas mensuales.</p>
+             Las tasas son semanales y se calculan automáticamente en las cuotas semanales.</p>
         </div>
       </div>
 
-      <div className="setting-group">
+      <div className={`setting-group ${darkMode ? 'dark' : ''}`}>
         <h4>💸 Tasas por Monto de Préstamo</h4>
         
         <div className="rate-setting-item high">
@@ -166,7 +166,7 @@ const Settings = ({ settings, setSettings, loans = [] }) => {
 
         <div className="rate-setting-item medium">
           <div className="rate-header">
-            <span className="rate-label">🟡 Préstamos Medianos (S/ 1,000 - 5,000)</span>
+            <span className="rate-label">🟡 Préstamos Medianos (S/ 1,001 - 5,000)</span>
             <span className="rate-description">Tasa estándar para montos intermedios</span>
           </div>
           <div className="rate-input">
@@ -184,7 +184,7 @@ const Settings = ({ settings, setSettings, loans = [] }) => {
 
         <div className="rate-setting-item low">
           <div className="rate-header">
-            <span className="rate-label">🔴 Préstamos Pequeños (menos de S/ 1,000)</span>
+            <span className="rate-label">🔴 Préstamos Pequeños (menor o igual a S/ 1,000)</span>
             <span className="rate-description">Tasa más alta para montos pequeños</span>
           </div>
           <div className="rate-input">
@@ -201,7 +201,7 @@ const Settings = ({ settings, setSettings, loans = [] }) => {
         </div>
       </div>
 
-      <div className="setting-group">
+      <div className={`setting-group ${darkMode ? 'dark' : ''}`}>
         <h4>⚠️ Recargo por Mora</h4>
         <div className="delinquency-info">
           <div className="info-card warning">
@@ -354,7 +354,7 @@ const Settings = ({ settings, setSettings, loans = [] }) => {
     <div className="settings-section">
       <h3>🔒 Configuración de Seguridad</h3>
       
-      <div className="setting-group">
+      <div className={`setting-group ${darkMode ? 'dark' : ''}`}>
         <h4>👥 Gestión de Usuarios</h4>
         <div className="security-info">
           <div className="info-item">
@@ -377,7 +377,7 @@ const Settings = ({ settings, setSettings, loans = [] }) => {
         </div>
       </div>
 
-      <div className="setting-group">
+      <div className={`setting-group ${darkMode ? 'dark' : ''}`}>
         <h4>📊 Auditoría y Logs</h4>
         <div className="audit-info">
           <p>Sistema de auditoría para rastrear cambios importantes:</p>
@@ -399,7 +399,7 @@ const Settings = ({ settings, setSettings, loans = [] }) => {
         </div>
       </div>
 
-      <div className="setting-group">
+      <div className={`setting-group ${darkMode ? 'dark' : ''}`}>
         <h4>🔐 Respaldo y Recuperación</h4>
         <div className="backup-info">
           <div className="info-item">
@@ -428,7 +428,7 @@ const Settings = ({ settings, setSettings, loans = [] }) => {
     <div className="settings-section">
       <h3>🔧 Configuración Avanzada</h3>
       
-      <div className="setting-group">
+      <div className={`setting-group ${darkMode ? 'dark' : ''}`}>
         <h4>📧 Notificaciones</h4>
         <div className="checkbox-group">
           <label className="checkbox-item">
@@ -450,11 +450,15 @@ const Settings = ({ settings, setSettings, loans = [] }) => {
         </div>
       </div>
 
-      <div className="setting-group">
+      <div className={`setting-group ${darkMode ? 'dark' : ''}`}>
         <h4>🎨 Personalización</h4>
         <div className="theme-selector">
           <label htmlFor="theme">Tema de la aplicación:</label>
-          <select id="theme">
+          <select 
+            id="theme" 
+            value={darkMode ? 'dark' : 'default'}
+            onChange={(e) => setDarkMode && setDarkMode(e.target.value === 'dark')}
+          >
             <option value="default">🎨 Tema por defecto</option>
             <option value="dark">🌙 Tema oscuro</option>
             <option value="high-contrast">🔆 Alto contraste</option>
@@ -462,7 +466,7 @@ const Settings = ({ settings, setSettings, loans = [] }) => {
         </div>
       </div>
 
-      <div className="setting-group">
+      <div className={`setting-group ${darkMode ? 'dark' : ''}`}>
         <h4>⚡ Rendimiento</h4>
         <div className="performance-settings">
           <div className="setting-item">
@@ -533,7 +537,7 @@ const Settings = ({ settings, setSettings, loans = [] }) => {
   }
 
   return (
-    <div className="settings-container">
+    <div className={`settings-container ${darkMode ? 'dark' : ''}`}>
       <div className="settings-header">
         <h2>🔧 Configuración del Sistema</h2>
         {hasChanges && (

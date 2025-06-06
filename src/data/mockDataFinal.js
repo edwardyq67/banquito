@@ -37,33 +37,44 @@ export const getCreditScoreDescription = (creditScore) => {
 
 // Función para encontrar el próximo miércoles desde una fecha dada
 const getNextWednesday = (date) => {
-  const d = new Date(date);
-  const day = d.getDay(); // 0 = domingo, 1 = lunes, ..., 3 = miércoles, ..., 6 = sábado
+  // Manejar correctamente la zona horaria
+  let d;
+  if (typeof date === 'string' && date.includes('-')) {
+    // Si es una fecha ISO string (YYYY-MM-DD), crear la fecha en hora local
+    const [year, month, day] = date.split('T')[0].split('-').map(Number);
+    d = new Date(year, month - 1, day, 12, 0, 0); // Usar mediodía para evitar problemas de zona horaria
+  } else {
+    d = new Date(date);
+  }
+  
+  const dayOfWeek = d.getDay(); // 0 = domingo, 1 = lunes, ..., 3 = miércoles, ..., 6 = sábado
   
   console.log('🗓️ getNextWednesday - Input:', {
     inputDate: date,
-    parsedDate: d.toISOString().split('T')[0],
-    dayOfWeek: day,
-    dayName: ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'][day]
+    parsedDate: d.toLocaleDateString('es-ES'),
+    dayOfWeek: dayOfWeek,
+    dayName: ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'][dayOfWeek]
   });
   
   let daysToAdd;
   
-  if (day === 3) {
-    // Si ya es miércoles, ir al próximo miércoles (7 días después)
+  // Calcular días hasta el próximo miércoles
+  if (dayOfWeek === 3) {
+    // Si es miércoles, ir al siguiente miércoles (7 días)
     daysToAdd = 7;
-  } else if (day < 3) {
-    // Si es domingo (0), lunes (1) o martes (2), ir al miércoles de la misma semana
-    daysToAdd = 3 - day;
+  } else if (dayOfWeek < 3) {
+    // Domingo (0), Lunes (1), Martes (2): ir al miércoles de esta semana
+    daysToAdd = 3 - dayOfWeek;
   } else {
-    // Si es jueves (4), viernes (5) o sábado (6), ir al miércoles de la próxima semana
-    daysToAdd = 7 - day + 3;
+    // Jueves (4), Viernes (5), Sábado (6): ir al miércoles de la próxima semana
+    daysToAdd = 10 - dayOfWeek;
   }
   
   d.setDate(d.getDate() + daysToAdd);
   
   console.log('✅ getNextWednesday - Output:', {
     resultDate: d.toISOString().split('T')[0],
+    localDate: d.toLocaleDateString('es-ES'),
     daysAdded: daysToAdd,
     resultDayOfWeek: d.getDay(),
     resultDayName: ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'][d.getDay()],
@@ -179,12 +190,20 @@ export const generateMockPaymentSchedule = (loanAmount, totalWeeks, monthlyInter
   let remainingBalance = loanAmount;
   
   // Para la primera semana, usar la fecha requerida como base
-  let currentDate = new Date(startDate);
+  // Manejar correctamente la fecha para evitar problemas de zona horaria
+  let currentDate;
+  if (typeof startDate === 'string' && startDate.includes('-')) {
+    const [year, month, day] = startDate.split('T')[0].split('-').map(Number);
+    currentDate = new Date(year, month - 1, day, 12, 0, 0);
+  } else {
+    currentDate = new Date(startDate);
+  }
   
   console.log('📅 generateMockPaymentSchedule - Fecha de inicio:', {
     originalStartDate: startDate,
     parsedCurrentDate: currentDate.toISOString().split('T')[0],
-    dayOfWeek: currentDate.getDay()
+    dayOfWeek: currentDate.getDay(),
+    dayName: ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'][currentDate.getDay()]
   });
   
   for (let i = 1; i <= totalWeeks; i++) {

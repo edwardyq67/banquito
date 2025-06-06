@@ -84,24 +84,33 @@ const AdminPanel = ({
 
   // Función para calcular la fecha del próximo miércoles
   const getNextWednesday = (date) => {
-    const nextDate = new Date(date);
-    const dayOfWeek = nextDate.getDay(); // 0 = domingo, 3 = miércoles
-    
-    // Si es miércoles, ir al próximo miércoles (7 días después)
-    // Si no es miércoles, ir al próximo miércoles más cercano
-    let daysToAdd;
-    if (dayOfWeek === 3) {
-      // Si es miércoles, ir al próximo miércoles (7 días después)
-      daysToAdd = 7;
-    } else if (dayOfWeek < 3) {
-      // Si es domingo (0), lunes (1) o martes (2), ir al miércoles de la misma semana
-      daysToAdd = 3 - dayOfWeek;
+    // Manejar correctamente la zona horaria
+    let d;
+    if (typeof date === 'string' && date.includes('-')) {
+      // Si es una fecha ISO string (YYYY-MM-DD), crear la fecha en hora local
+      const [year, month, day] = date.split('T')[0].split('-').map(Number);
+      d = new Date(year, month - 1, day, 12, 0, 0); // Usar mediodía para evitar problemas de zona horaria
     } else {
-      // Si es jueves (4), viernes (5) o sábado (6), ir al miércoles de la próxima semana
-      daysToAdd = 7 - dayOfWeek + 3;
+      d = new Date(date);
     }
     
-    nextDate.setDate(nextDate.getDate() + daysToAdd);
+    const dayOfWeek = d.getDay(); // 0 = domingo, 3 = miércoles
+    
+    // Calcular días hasta el próximo miércoles
+    let daysToAdd;
+    if (dayOfWeek === 3) {
+      // Si es miércoles, ir al siguiente miércoles (7 días)
+      daysToAdd = 7;
+    } else if (dayOfWeek < 3) {
+      // Domingo (0), Lunes (1), Martes (2): ir al miércoles de esta semana
+      daysToAdd = 3 - dayOfWeek;
+    } else {
+      // Jueves (4), Viernes (5), Sábado (6): ir al miércoles de la próxima semana
+      daysToAdd = 10 - dayOfWeek;
+    }
+    
+    const nextDate = new Date(d);
+    nextDate.setDate(d.getDate() + daysToAdd);
     return nextDate;
   };
 
@@ -175,9 +184,21 @@ const AdminPanel = ({
     // La primera fecha de pago viene del cronograma
     const firstPaymentDate = paymentSchedule[0]?.dueDate || new Date().toISOString().split('T')[0];
 
+    // Verificar si existe un préstamo con este ID
+    const existingLoan = loans.find(loan => 
+      loan.id === requestId || loan.id === Number(requestId) || String(loan.id) === String(requestId)
+    );
+    
+    if (!existingLoan) {
+      console.error('❌ No se encontró el préstamo con ID:', requestId);
+      return;
+    }
+    
     // Actualizar el préstamo existente con estado "Por aprobar" en lugar de crear uno nuevo
     setLoans(prev => prev.map(loan => {
-      if (loan.requestId === requestId || loan.id === requestId) {
+      // Comparar como números para evitar problemas de tipo
+      if (loan.id === requestId || loan.id === Number(requestId) || String(loan.id) === String(requestId)) {
+        console.log(`Actualizando préstamo existente ID: ${loan.id} para ${request.memberName}`);
         return {
           ...loan,
           status: 'Aprobada', // Cambiar de "Por aprobar" a "Aprobada"
@@ -211,7 +232,9 @@ const AdminPanel = ({
 
     // Actualizar el préstamo existente con estado "Rechazada"
     setLoans(prev => prev.map(loan => {
-      if (loan.requestId === requestId || loan.id === requestId) {
+      // Comparar como números para evitar problemas de tipo
+      if (loan.id === requestId || loan.id === Number(requestId) || String(loan.id) === String(requestId)) {
+        console.log(`Rechazando préstamo existente ID: ${loan.id} para ${request.memberName}`);
         return {
           ...loan,
           status: 'Rechazada', // Cambiar de "Por aprobar" a "Rechazada"

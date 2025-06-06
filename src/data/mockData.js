@@ -80,13 +80,32 @@ export const getCreditScoreDescription = (creditScore) => {
 
 // Función para encontrar el próximo miércoles desde una fecha dada
 const getNextWednesday = (date) => {
-  const d = new Date(date);
-  const day = d.getDay();
-  const daysUntilWednesday = (3 - day + 7) % 7;
-  if (daysUntilWednesday === 0 && d.getDay() === 3) {
-    return d; // Ya es miércoles
+  // Manejar correctamente la zona horaria
+  let d;
+  if (typeof date === 'string' && date.includes('-')) {
+    // Si es una fecha ISO string (YYYY-MM-DD), crear la fecha en hora local
+    const [year, month, day] = date.split('T')[0].split('-').map(Number);
+    d = new Date(year, month - 1, day, 12, 0, 0); // Usar mediodía para evitar problemas de zona horaria
+  } else {
+    d = new Date(date);
   }
-  d.setDate(d.getDate() + (daysUntilWednesday === 0 ? 7 : daysUntilWednesday));
+  
+  const dayOfWeek = d.getDay();
+  let daysToAdd;
+  
+  // Lógica actualizada: ir al próximo miércoles (no saltar una semana completa)
+  if (dayOfWeek === 3) {
+    // Si es miércoles, ir al siguiente miércoles (7 días)
+    daysToAdd = 7;
+  } else if (dayOfWeek < 3) {
+    // Domingo (0), Lunes (1), Martes (2): ir al miércoles de esta semana
+    daysToAdd = 3 - dayOfWeek;
+  } else {
+    // Jueves (4), Viernes (5), Sábado (6): ir al miércoles de la próxima semana
+    daysToAdd = 10 - dayOfWeek;
+  }
+  
+  d.setDate(d.getDate() + daysToAdd);
   return d;
 };
 

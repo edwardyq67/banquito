@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import './Reports.css';
 import * as XLSX from 'xlsx';
 
-const Reports = ({ loans, members }) => {
+const Reports = ({ loans, members, darkMode }) => {
   const [activeReport, setActiveReport] = useState('overview');
   const [dateRange, setDateRange] = useState({
     start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -13,6 +13,10 @@ const Reports = ({ loans, members }) => {
   const [filterMember, setFilterMember] = useState('');
   const [filterWeeks, setFilterWeeks] = useState('all');
   const [showOnlyWithPayments, setShowOnlyWithPayments] = useState(false);
+  
+  // Estado para el modal de detalles
+  const [selectedWeek, setSelectedWeek] = useState(null);
+  const [showWeekModal, setShowWeekModal] = useState(false);
 
   const calculateOverviewStats = () => {
     const totalLoans = loans.length;
@@ -893,6 +897,155 @@ const Reports = ({ loans, members }) => {
     window.print();
   };
 
+  // Función para exportar una semana específica a Excel
+  const exportWeekToExcel = (weekData) => {
+    const wb = XLSX.utils.book_new();
+    
+    // Crear hoja de cálculo
+    const wsData = [
+      [`Cronograma de Cobros - ${weekData.week}`],
+      [`Período: ${weekData.weekRange}`],
+      [`Total de Pagos: ${weekData.paymentsCount}`],
+      [`Monto Total: S/ ${(weekData.expectedAmount || 0).toLocaleString()}`],
+      [''],
+      ['Nombre', 'Fecha de Pago', 'Monto', 'Teléfono', 'Estado']
+    ];
+    
+    // Agregar datos de cada préstamo
+    weekData.loans.forEach(loan => {
+      const member = members.find(m => m.id === loan.memberId);
+      wsData.push([
+        loan.memberName,
+        new Date(loan.dueDate).toLocaleDateString('es-ES'),
+        `S/ ${(loan.weeklyPayment || loan.monthlyPayment || 0).toLocaleString()}`,
+        member?.phone || 'N/A',
+        loan.status
+      ]);
+    });
+    
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    
+    // Estilos y anchos de columna
+    ws['!cols'] = [
+      { wch: 25 }, // Nombre
+      { wch: 15 }, // Fecha
+      { wch: 15 }, // Monto
+      { wch: 15 }, // Teléfono
+      { wch: 12 }  // Estado
+    ];
+    
+    XLSX.utils.book_append_sheet(wb, ws, 'Semana');
+    XLSX.writeFile(wb, `Cobros_${weekData.week.replace(/ /g, '_')}.xlsx`);
+  };
+
+  // Función para exportar una semana a PDF/Imprimir
+  const exportWeekToPDF = (weekData) => {
+    // Crear una ventana nueva con el contenido formateado para impresión
+    const printWindow = window.open('', '_blank');
+    
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Cronograma ${weekData.week}</title>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            color: #333;
+          }
+          .header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #333;
+            padding-bottom: 10px;
+          }
+          h1 { margin: 0 0 10px 0; }
+          .info { margin: 5px 0; }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+          }
+          th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+          }
+          th {
+            background-color: #f5f5f5;
+            font-weight: bold;
+          }
+          tr:nth-child(even) {
+            background-color: #f9f9f9;
+          }
+          .summary {
+            margin-top: 20px;
+            padding: 10px;
+            background: #f0f0f0;
+            border-radius: 5px;
+          }
+          @media print {
+            body { margin: 0; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>BANQUITO SYSTEM</h1>
+          <h2>Cronograma de Cobros - ${weekData.week}</h2>
+          <div class="info">Período: ${weekData.weekRange}</div>
+          <div class="info">Fecha de generación: ${new Date().toLocaleDateString('es-ES')}</div>
+        </div>
+        
+        <div class="summary">
+          <strong>Resumen:</strong><br>
+          Total de cobros: ${weekData.paymentsCount}<br>
+          Monto total: S/ ${(weekData.expectedAmount || 0).toLocaleString()}
+        </div>
+        
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Nombre</th>
+              <th>Fecha de Pago</th>
+              <th>Monto</th>
+              <th>Teléfono</th>
+              <th>DNI</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${weekData.loans.map((loan, index) => {
+              const member = members.find(m => m.id === loan.memberId);
+              return `
+                <tr>
+                  <td>${index + 1}</td>
+                  <td>${loan.memberName}</td>
+                  <td>${new Date(loan.dueDate).toLocaleDateString('es-ES')}</td>
+                  <td>S/ ${(loan.weeklyPayment || loan.monthlyPayment || 0).toLocaleString()}</td>
+                  <td>${member?.phone || 'N/A'}</td>
+                  <td>${member?.dni || 'N/A'}</td>
+                  <td>${loan.status}</td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      </body>
+      </html>
+    `;
+    
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+    
+    // Esperar a que se cargue y luego imprimir
+    printWindow.onload = () => {
+      printWindow.print();
+    };
+  };
+
   // Debug: Verificar datos de entrada
   console.log('🔍 DEBUG - Datos de entrada al componente Reports:');
   console.log('💰 Préstamos totales:', loans?.length || 0);
@@ -1383,6 +1536,9 @@ const Reports = ({ loans, members }) => {
                   {week.paymentsCount === 0 ? 'Sin pagos' : `${week.paymentsCount} pagos`}
                 </span>
                 <span className="expected-amount">S/ {(week.expectedAmount || 0).toLocaleString()}</span>
+                {week.expectedAmount > 0 && (
+                  <span className="daily-average">S/ {Math.round((week.expectedAmount || 0) / 7).toLocaleString()}/día</span>
+                )}
               </div>
             </div>
             
@@ -1418,18 +1574,33 @@ const Reports = ({ loans, members }) => {
               </div>
             )}
 
-            {/* Mostrar total de la semana */}
-            <div className="week-summary">
-              <div className="summary-item">
-                <span className="summary-label">Total Semana:</span>
-                <span className="summary-value">S/ {(week.expectedAmount || 0).toLocaleString()}</span>
-              </div>
-              {week.expectedAmount > 0 && (
-                <div className="summary-item">
-                  <span className="summary-label">Promedio diario:</span>
-                  <span className="summary-value">S/ {Math.round((week.expectedAmount || 0) / 7).toLocaleString()}</span>
-                </div>
-              )}
+            
+            {/* Botones de acción */}
+            <div className="card-actions">
+              <button 
+                className="action-btn details-btn"
+                onClick={() => {
+                  setSelectedWeek(week);
+                  setShowWeekModal(true);
+                }}
+                title="Ver detalles"
+              >
+                👁️ Detalles
+              </button>
+              <button 
+                className="action-btn excel-btn"
+                onClick={() => exportWeekToExcel(week)}
+                title="Exportar a Excel"
+              >
+                📊 Excel
+              </button>
+              <button 
+                className="action-btn pdf-btn"
+                onClick={() => exportWeekToPDF(week)}
+                title="Exportar a PDF/Imprimir"
+              >
+                📄 PDF
+              </button>
             </div>
           </div>
         ))}
@@ -1494,7 +1665,7 @@ const Reports = ({ loans, members }) => {
   };
 
   return (
-    <div className="reports-container">
+    <div className={`reports-container ${darkMode ? 'dark-mode' : ''}`}>
       <div className="reports-header">
         <h2>📈 Reportes y Análisis</h2>
         <div className="report-actions">
@@ -1544,6 +1715,98 @@ const Reports = ({ loans, members }) => {
           <span>👨‍💼 Sistema Banquito - Reporte Administrativo</span>
         </div>
       </div>
+      
+      {/* Modal de detalles de la semana */}
+      {showWeekModal && selectedWeek && (
+        <div className="modal-overlay" onClick={() => setShowWeekModal(false)}>
+          <div className="modal-content week-details-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>📅 Detalles - {selectedWeek.week}</h3>
+              <button className="close-btn" onClick={() => setShowWeekModal(false)}>×</button>
+            </div>
+            
+            <div className="modal-body">
+              <div className="week-info">
+                <div className="info-row">
+                  <span className="info-label">Período:</span>
+                  <span className="info-value">{selectedWeek.weekRange}</span>
+                </div>
+                <div className="info-row">
+                  <span className="info-label">Total de cobros:</span>
+                  <span className="info-value">{selectedWeek.paymentsCount}</span>
+                </div>
+                <div className="info-row">
+                  <span className="info-label">Monto total:</span>
+                  <span className="info-value highlight">S/ {(selectedWeek.expectedAmount || 0).toLocaleString()}</span>
+                </div>
+              </div>
+              
+              <h4>Lista detallada de cobros:</h4>
+              <div className="modal-table-wrapper">
+                <table className="modal-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Nombre</th>
+                      <th>Fecha</th>
+                      <th>Monto</th>
+                      <th>Teléfono</th>
+                      <th>DNI</th>
+                      <th>Garantía</th>
+                      <th>Calificación</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedWeek.loans.map((loan, index) => {
+                      const member = members.find(m => m.id === loan.memberId);
+                      return (
+                        <tr key={loan.id}>
+                          <td>{index + 1}</td>
+                          <td>{loan.memberName}</td>
+                          <td>{new Date(loan.dueDate).toLocaleDateString('es-ES')}</td>
+                          <td>S/ {(loan.weeklyPayment || loan.monthlyPayment || 0).toLocaleString()}</td>
+                          <td>{member?.phone || 'N/A'}</td>
+                          <td>{member?.dni || 'N/A'}</td>
+                          <td>{member?.guarantee || 'N/A'}</td>
+                          <td>
+                            <span className={`credit-badge ${member?.creditRating || 'unrated'}`}>
+                              {member?.creditRating === 'green' && '🟢'}
+                              {member?.creditRating === 'yellow' && '🟡'}
+                              {member?.creditRating === 'red' && '🔴'}
+                              {!member?.creditRating && '⚪'}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              
+              <div className="modal-actions">
+                <button 
+                  className="modal-action-btn excel"
+                  onClick={() => exportWeekToExcel(selectedWeek)}
+                >
+                  📊 Exportar a Excel
+                </button>
+                <button 
+                  className="modal-action-btn pdf"
+                  onClick={() => exportWeekToPDF(selectedWeek)}
+                >
+                  📄 Exportar a PDF
+                </button>
+                <button 
+                  className="modal-action-btn close"
+                  onClick={() => setShowWeekModal(false)}
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -45,18 +45,31 @@ const MemberLoansSection = ({ userLoans, getStatusInfo }) => {
   const startIndex = (currentPage - 1) * itemsPerPage;
   const currentLoans = filteredLoans.slice(startIndex, startIndex + itemsPerPage);
 
-  const getNextWednesday = () => {
-    const today = new Date();
-    const dayOfWeek = today.getDay();
-    const nextDate = new Date(today);
+  const getNextWednesday = (date) => {
+    // Manejar correctamente la zona horaria
+    let d;
+    if (typeof date === 'string' && date.includes('-')) {
+      // Si es una fecha ISO string (YYYY-MM-DD), crear la fecha en hora local
+      const [year, month, day] = date.split('T')[0].split('-').map(Number);
+      d = new Date(year, month - 1, day, 12, 0, 0); // Usar mediodía para evitar problemas de zona horaria
+    } else {
+      d = new Date(date);
+    }
+    
+    const dayOfWeek = d.getDay();
+    const nextDate = new Date(d);
     let daysToAdd;
     
-    if (dayOfWeek === 3) {
-      daysToAdd = 7;
-    } else if (dayOfWeek < 3) {
+    // Calcular días hasta el próximo miércoles
+    if (dayOfWeek < 3) {
+      // Domingo (0), Lunes (1), Martes (2): calcular días hasta el miércoles
       daysToAdd = 3 - dayOfWeek;
+    } else if (dayOfWeek === 3) {
+      // Si es miércoles, ir al siguiente miércoles (7 días)
+      daysToAdd = 7;
     } else {
-      daysToAdd = 7 - dayOfWeek + 3;
+      // Jueves (4), Viernes (5), Sábado (6): calcular días hasta el próximo miércoles
+      daysToAdd = 10 - dayOfWeek;
     }
     
     nextDate.setDate(nextDate.getDate() + daysToAdd);
@@ -140,7 +153,7 @@ const MemberLoansSection = ({ userLoans, getStatusInfo }) => {
                     <div className="payment-date">
                       <span className="label">Próximo pago: </span>
                       <span className="value">
-                        {getNextWednesday().toLocaleDateString('es-ES', { 
+                        {new Date(loan.dueDate).toLocaleDateString('es-ES', { 
                           weekday: 'long', 
                           day: 'numeric', 
                           month: 'long' 
@@ -332,6 +345,7 @@ const Dashboard = ({
   setUsers 
 }) => {
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [darkMode, setDarkMode] = useState(false);
 
   const getOverdueLoans = () => {
     const today = new Date();
@@ -361,11 +375,31 @@ const Dashboard = ({
   const getUserLoans = () => {
     if (user.role === 'member' && user.memberId) {
       // Solo préstamos realmente activos (excluir solicitudes pendientes y rechazadas)
-      return loans.filter(loan => 
+      const userActiveLoans = loans.filter(loan => 
         loan.memberId === user.memberId && 
         loan.status !== 'Por aprobar' && 
         loan.status !== 'Rechazada'
       );
+      console.log('🔍 getUserLoans - Filtrando préstamos para miembro:', user.memberId);
+      console.log('📊 Total préstamos del usuario:', loans.filter(l => l.memberId === user.memberId).length);
+      console.log('✅ Préstamos activos (sin Por aprobar/Rechazada):', userActiveLoans.length);
+      
+      // DATOS PARA DASHBOARD
+      const dashboardData = userActiveLoans.map(loan => ({
+        seccion: 'DASHBOARD',
+        nombre: loan.memberName,
+        fechaVencimiento: loan.dueDate,
+        montoOriginal: loan.originalAmount,
+        montoPendiente: loan.remainingAmount,
+        estado: loan.status,
+        semanaActual: loan.currentWeek || loan.currentInstallment,
+        totalSemanas: loan.totalWeeks || loan.installments
+      }));
+      
+      // Guardar en window para comparación
+      window.dashboardLoansData = dashboardData;
+      
+      return userActiveLoans;
     }
     return [];
   };
@@ -403,12 +437,34 @@ const Dashboard = ({
   };
 
   // Función para calcular el próximo miércoles
-  const getNextWednesday = () => {
-    const today = new Date();
-    const dayOfWeek = today.getDay(); // 0 = domingo, 3 = miércoles
-    const daysToAdd = dayOfWeek <= 3 ? 3 - dayOfWeek : 7 - dayOfWeek + 3;
-    const nextWednesday = new Date(today);
-    nextWednesday.setDate(today.getDate() + daysToAdd);
+  const getNextWednesday = (date) => {
+    // Manejar correctamente la zona horaria
+    let d;
+    if (typeof date === 'string' && date.includes('-')) {
+      // Si es una fecha ISO string (YYYY-MM-DD), crear la fecha en hora local
+      const [year, month, day] = date.split('T')[0].split('-').map(Number);
+      d = new Date(year, month - 1, day, 12, 0, 0); // Usar mediodía para evitar problemas de zona horaria
+    } else {
+      d = new Date(date);
+    }
+    
+    const dayOfWeek = d.getDay(); // 0 = domingo, 3 = miércoles
+    let daysToAdd;
+    
+    // Calcular días hasta el próximo miércoles
+    if (dayOfWeek < 3) {
+      // Domingo (0), Lunes (1), Martes (2): calcular días hasta el miércoles
+      daysToAdd = 3 - dayOfWeek;
+    } else if (dayOfWeek === 3) {
+      // Si es miércoles, ir al siguiente miércoles (7 días)
+      daysToAdd = 7;
+    } else {
+      // Jueves (4), Viernes (5), Sábado (6): calcular días hasta el próximo miércoles
+      daysToAdd = 10 - dayOfWeek;
+    }
+    
+    const nextWednesday = new Date(d);
+    nextWednesday.setDate(d.getDate() + daysToAdd);
     return nextWednesday;
   };
 
@@ -418,13 +474,13 @@ const Dashboard = ({
     const daysDiff = Math.floor((dueDate - today) / (1000 * 60 * 60 * 24));
 
     if (loan.status === 'paid') {
-      return { label: 'Pagado', class: 'paid', icon: '✅' };
+      return { label: 'Pagado', class: 'paid', icon: '●' };
     } else if (daysDiff < 0) {
-      return { label: `Vencido (${Math.abs(daysDiff)} días)`, class: 'overdue', icon: '🔴' };
+      return { label: `Vencido (${Math.abs(daysDiff)} días)`, class: 'overdue', icon: '●' };
     } else if (daysDiff <= 3) {
-      return { label: `Vence en ${daysDiff} días`, class: 'due-soon', icon: '🟡' };
+      return { label: `Vence en ${daysDiff} días`, class: 'due-soon', icon: '●' };
     } else {
-      return { label: 'Al día', class: 'current', icon: '🟢' };
+      return { label: 'Al día', class: 'current', icon: '●' };
     }
   };
 
@@ -563,7 +619,11 @@ const Dashboard = ({
                       Math.min(
                         settings?.loanLimits?.individual || 8000, 
                         ((userMember?.shares || 0) * (settings?.shareValue || 500)) * 0.8
-                      ) - userLoans.filter(loan => loan.status !== 'paid').reduce((sum, loan) => sum + loan.remainingAmount, 0)
+                      ) - userLoans.filter(loan => 
+                        loan.status !== 'paid' && 
+                        loan.status !== 'Rechazada' && 
+                        loan.status !== 'Por aprobar'
+                      ).reduce((sum, loan) => sum + loan.remainingAmount, 0)
                     ).toLocaleString()}
                   </div>
                   <div className="stat-subtitle">límite de préstamo</div>
@@ -685,7 +745,7 @@ const Dashboard = ({
         return renderDashboardContent();
       case 'loans':
         return <LoansTable 
-          loans={user.role === 'member' ? getAllUserLoans() : loans}
+          loans={user.role === 'member' ? getUserLoans() : loans}
           setLoans={setLoans}
           members={members}
           userRole={user.role}
@@ -703,6 +763,7 @@ const Dashboard = ({
           calculateAvailableCapital={calculateAvailableCapital}
           loanRequests={loanRequests}
           setLoanRequests={setLoanRequests}
+          darkMode={darkMode}
         />;
       case 'members':
         return <MembersTable 
@@ -711,6 +772,7 @@ const Dashboard = ({
           settings={settings}
           users={users}
           setUsers={setUsers}
+          darkMode={darkMode}
         />;
       case 'admin':
         return <AdminPanel 
@@ -724,9 +786,15 @@ const Dashboard = ({
           getPaymentWithLateFee={getPaymentWithLateFee}
         />;
       case 'reports':
-        return <Reports loans={loans} members={members} />;
+        return <Reports loans={loans} members={members} darkMode={darkMode} />;
       case 'settings':
-        return <Settings settings={settings} setSettings={setSettings} loans={loans} />;
+        return <Settings 
+          settings={settings} 
+          setSettings={setSettings} 
+          loans={loans} 
+          darkMode={darkMode}
+          setDarkMode={setDarkMode}
+        />;
       case 'calendar':
         return <Calendar 
           loans={loans} 
@@ -735,6 +803,7 @@ const Dashboard = ({
           onUpdateLoan={setLoans}
           onUpdateLoanRequest={setLoanRequests}
           currentUser={user}
+          darkMode={darkMode}
         />;
       case 'savings':
         if (user.role === 'member' && userMember) {
@@ -756,7 +825,7 @@ const Dashboard = ({
   };
 
   return (
-    <div className="dashboard-container">
+    <div className={`dashboard-container ${darkMode ? 'dark' : ''}`}>
       <div className="dashboard-tabs">
         <button 
           className={`tab-btn ${activeTab === 'dashboard' ? 'active' : ''}`}
@@ -830,7 +899,7 @@ const Dashboard = ({
         )}
       </div>
 
-      <div className="dashboard-main">
+      <div className={`dashboard-main ${darkMode ? 'dark' : ''}`}>
         {renderTabContent()}
       </div>
     </div>

@@ -11,7 +11,8 @@ const LoanRequest = ({
   getMonthlyInterestRate, 
   calculateAvailableCapital,
   loanRequests,
-  setLoanRequests 
+  setLoanRequests,
+  darkMode 
 }) => {
   const [formData, setFormData] = useState({
     amount: '',
@@ -200,12 +201,38 @@ const LoanRequest = ({
     // Use required date if provided, otherwise use today
     const startDate = formData.requiredDate || new Date().toISOString();
     
-    return generateMockPaymentSchedule(
+    const schedule = generateMockPaymentSchedule(
       calculatedData.requestedAmount,
       calculatedData.totalWeeks,
       calculatedData.monthlyInterestRate,
       startDate
     );
+    
+    // Mostrar el cronograma completo en consola
+    console.log('🎯 generateMockPaymentSchedule - Cronograma completo (primeras 3 semanas):', schedule.slice(0, 3));
+    
+    // Mostrar detalles adicionales
+    if (schedule.length > 0) {
+      console.log('📅 DETALLES DEL CRONOGRAMA DE PAGOS:');
+      console.log('Monto solicitado:', calculatedData.requestedAmount);
+      console.log('Tasa de interés mensual:', calculatedData.monthlyInterestRate + '%');
+      console.log('Total de semanas:', calculatedData.totalWeeks);
+      console.log('Pago semanal:', calculatedData.weeklyPayment);
+      console.log('Primera fecha de pago:', schedule[0].dueDate);
+      console.log('Última fecha de pago:', schedule[schedule.length - 1].dueDate);
+      
+      // Tabla detallada de las primeras 3 semanas
+      console.table(schedule.slice(0, 3).map(payment => ({
+        semana: payment.week,
+        fecha: payment.dueDate,
+        pago: payment.amount || payment.weeklyPayment,
+        capital: payment.capitalPayment,
+        interes: payment.interestPayment,
+        saldoPendiente: payment.remainingBalance
+      })));
+    }
+    
+    return schedule;
   };
 
   if (!userMember) {
@@ -219,9 +246,14 @@ const LoanRequest = ({
     );
   }
 
-  // Calcular el total de préstamos activos del usuario
+  // Calcular el total de préstamos activos del usuario (excluyendo rechazados y pendientes)
   const userActiveLoansTotal = loans ? loans
-    .filter(loan => loan.memberId === user.memberId && loan.status !== 'paid')
+    .filter(loan => 
+      loan.memberId === user.memberId && 
+      loan.status !== 'paid' && 
+      loan.status !== 'Rechazada' && 
+      loan.status !== 'Por aprobar'
+    )
     .reduce((total, loan) => total + loan.remainingAmount, 0) : 0;
 
   // Calcular el límite base según garantía y configuración
@@ -234,7 +266,7 @@ const LoanRequest = ({
   const maxLoanAmount = Math.max(0, baseLoanLimit - userActiveLoansTotal);
 
   return (
-    <div className="loan-request-container">
+    <div className={`loan-request-container ${darkMode ? 'dark' : ''}`}>
       <div className="request-header">
         <h2>📝 Solicitar Préstamo</h2>
         <div className="member-summary">
@@ -396,7 +428,7 @@ const LoanRequest = ({
                 <span className="rate-value">{settings.monthlyInterestRates?.medium || 5}% mensual</span>
               </div>
               <div className="rate-item">
-                <span className="rate-range">Menos de S/ 1,000:</span>
+                <span className="rate-range">Menos o igual de S/ 1,000:</span>
                 <span className="rate-value">{settings.monthlyInterestRates?.low || 10}% mensual</span>
               </div>
             </div>
@@ -408,7 +440,15 @@ const LoanRequest = ({
         <div className="schedule-section">
           <h3>📅 Cronograma de Pagos Semanales</h3>
           <div className="schedule-info">
-            <p>ℹ️ Primera cuota: <strong>{generateSchedule()[0]?.dueDate ? new Date(generateSchedule()[0].dueDate).toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : 'No disponible'}</strong></p>
+            <p>ℹ️ Primera cuota: <strong>{(() => {
+              const firstPayment = generateSchedule()[0];
+              if (firstPayment?.dueDate) {
+                const [year, month, day] = firstPayment.dueDate.split('-').map(Number);
+                const firstDate = new Date(year, month - 1, day, 12, 0, 0);
+                return firstDate.toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+              }
+              return 'No disponible';
+            })()}</strong></p>
             <p>Los pagos se realizan todos los <strong>miércoles</strong></p>
           </div>
           
@@ -472,16 +512,22 @@ const LoanRequest = ({
                     filteredSchedule = schedule.slice(-4);
                   }
                   
-                  return filteredSchedule.map(payment => (
-                    <tr key={payment.week} className={payment.week <= 4 ? 'highlight-row' : ''}>
-                      <td>Semana {payment.week}</td>
-                      <td>{new Date(payment.dueDate).toLocaleDateString('es-ES', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' })}</td>
-                      <td>S/ {(payment?.weeklyPayment || 0).toLocaleString()}</td>
-                      <td>S/ {(payment?.capitalPayment || 0).toLocaleString()}</td>
-                      <td>S/ {(payment?.interestPayment || 0).toLocaleString()}</td>
-                      <td>S/ {(payment?.remainingBalance || 0).toLocaleString()}</td>
-                    </tr>
-                  ));
+                  return filteredSchedule.map(payment => {
+                    // Manejar la fecha correctamente para evitar problemas de zona horaria
+                    const [year, month, day] = payment.dueDate.split('-').map(Number);
+                    const paymentDate = new Date(year, month - 1, day, 12, 0, 0); // Usar mediodía para evitar problemas
+                    
+                    return (
+                      <tr key={payment.week} className={payment.week <= 4 ? 'highlight-row' : ''}>
+                        <td>Semana {payment.week}</td>
+                        <td>{paymentDate.toLocaleDateString('es-ES', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' })}</td>
+                        <td>S/ {(payment?.weeklyPayment || 0).toLocaleString()}</td>
+                        <td>S/ {(payment?.capitalPayment || 0).toLocaleString()}</td>
+                        <td>S/ {(payment?.interestPayment || 0).toLocaleString()}</td>
+                        <td>S/ {(payment?.remainingBalance || 0).toLocaleString()}</td>
+                      </tr>
+                    );
+                  });
                 })()}
               </tbody>
             </table>

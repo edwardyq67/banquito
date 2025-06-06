@@ -163,11 +163,11 @@ function App() {
     if (!settings.monthlyInterestRates) {
       // Fallback values if monthlyInterestRates is undefined
       if (amount > 5000) return 3;
-      if (amount >= 1000) return 5;
+      if (amount > 1000) return 5;
       return 10;
     }
     if (amount > 5000) return settings.monthlyInterestRates.high;
-    if (amount >= 1000) return settings.monthlyInterestRates.medium;
+    if (amount > 1000) return settings.monthlyInterestRates.medium;
     return settings.monthlyInterestRates.low;
   };
 

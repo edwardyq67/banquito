@@ -16,79 +16,129 @@ const LoansTable = ({ loans, setLoans, members, userRole, calculateLateFee, getP
     console.log('📊 Total préstamos:', loans.length);
     console.log('💰 Monto total pendiente:', loans.reduce((sum, loan) => sum + loan.remainingAmount, 0));
     
-    // Buscar específicamente préstamos de Arteaga
-    const arteagaLoans = loans.filter(loan => loan.memberName === 'Arteaga');
-    console.log('🎯 Préstamos de Arteaga:', arteagaLoans);
-    console.log('💵 Total original Arteaga:', arteagaLoans.reduce((sum, loan) => sum + loan.originalAmount, 0));
-    console.log('💳 Total pendiente Arteaga:', arteagaLoans.reduce((sum, loan) => sum + loan.remainingAmount, 0));
+    // Mostrar el cronograma de pagos de cada préstamo
+    loans.forEach((loan, index) => {
+      console.log(`\n📋 Préstamo ${index + 1} - ${loan.memberName}:`);
+      console.log('Detalles del préstamo:', {
+        id: loan.id,
+        nombre: loan.memberName,
+        fechaVencimiento: loan.dueDate,
+        montoOriginal: loan.originalAmount,
+        montoPendiente: loan.remainingAmount,
+        estado: loan.status
+      });
+      
+      if (loan.paymentSchedule && loan.paymentSchedule.length > 0) {
+        console.log(`🎯 Cronograma de pagos - Primeras 3 semanas para ${loan.memberName}:`, 
+          loan.paymentSchedule.slice(0, 3).map(payment => ({
+            semana: payment.week,
+            fecha: payment.dueDate,
+            monto: payment.amount || payment.weeklyPayment || payment.weeklyCapital,
+            capital: payment.capitalPayment || payment.weeklyCapital,
+            interes: payment.interestPayment || payment.weeklyInterest,
+            saldoPendiente: payment.remainingBalance
+          }))
+        );
+      } else {
+        console.log('⚠️ Este préstamo no tiene cronograma de pagos');
+      }
+    });
+    
+    // DATOS PARA REGISTRO DE DEUDORES
+    const deudoresData = loans.map(loan => ({
+      seccion: 'REGISTRO_DEUDORES',
+      nombre: loan.memberName,
+      fechaVencimiento: loan.dueDate,
+      montoOriginal: loan.originalAmount,
+      montoPendiente: loan.remainingAmount,
+      estado: loan.status,
+      semanaActual: loan.currentWeek || loan.currentInstallment,
+      totalSemanas: loan.totalWeeks || loan.installments,
+      primerPago: loan.paymentSchedule?.[0]?.dueDate || 'Sin cronograma',
+      segundoPago: loan.paymentSchedule?.[1]?.dueDate || 'Sin cronograma',
+      tercerPago: loan.paymentSchedule?.[2]?.dueDate || 'Sin cronograma'
+    }));
+    
+    // Guardar en window para comparación
+    window.registroDeudoresData = deudoresData;
     
     setRefreshKey(prev => prev + 1);
   }, [loans]);
 
   const getStatusInfo = (loan) => {
-    // Manejar estados de solicitudes primero
-    if (loan.status === 'Por aprobar') {
-      return { label: 'Por aprobar', class: 'pending-approval', icon: '⏳' };
-    } else if (loan.status === 'Aprobada') {
-      return { label: 'Aprobada', class: 'approved', icon: '✅' };
-    } else if (loan.status === 'Rechazada') {
+    // Manejar estados de solicitudes y préstamos rechazados primero
+    if (loan.status === 'Rechazada' || loan.status === 'rejected') {
       return { label: 'Rechazada', class: 'rejected', icon: '❌' };
+    } else if (loan.status === 'Por aprobar' || loan.status === 'pending') {
+      return { label: 'Por aprobar', class: 'pending-approval', icon: '⏳' };
+    } else if (loan.status === 'Aprobada' || loan.status === 'approved') {
+      return { label: 'Aprobada', class: 'approved', icon: '✅' };
     }
 
-    // Estados normales de préstamos
+    // Si el préstamo tiene cronograma, usar la fecha del próximo pago
+    let nextDueDate = loan.dueDate;
+    if (loan.paymentSchedule && loan.paymentSchedule.length > 0) {
+      const currentWeek = loan.currentWeek || loan.currentInstallment || 1;
+      const nextPayment = loan.paymentSchedule.find(p => p.week === currentWeek);
+      if (nextPayment) {
+        nextDueDate = nextPayment.dueDate;
+      }
+    }
+
+    // Estados normales de préstamos activos
     const today = new Date();
-    const dueDate = new Date(loan.dueDate);
-    const daysDiff = Math.floor((dueDate - today) / (1000 * 60 * 60 * 24));
+    today.setHours(0, 0, 0, 0);
+    
+    // Manejar correctamente la fecha para evitar problemas de zona horaria
+    const [year, month, day] = nextDueDate.split('-').map(Number);
+    const dueDate = new Date(year, month - 1, day, 12, 0, 0); // Usar mediodía para evitar problemas
+    
+    const todayStr = today.toISOString().split('T')[0];
+    const dueDateStr = nextDueDate;
 
     if (loan.status === 'paid') {
       return { label: 'Pagado', class: 'paid', icon: '✅' };
-    } else if (daysDiff < 0) {
-      return { label: `Vencido (${Math.abs(daysDiff)} días)`, class: 'overdue', icon: '🔴' };
-    } else if (daysDiff <= 3) {
-      return { label: `Vence en ${daysDiff} días`, class: 'due-soon', icon: '🟡' };
+    } else if (dueDateStr < todayStr) {
+      // Calcular días de atraso
+      const daysDiff = Math.floor((today - dueDate) / (1000 * 60 * 60 * 24));
+      return { label: `Vencido (${daysDiff} días)`, class: 'overdue', icon: '🔴' };
+    } else if (dueDateStr === todayStr) {
+      // Hoy es el día de pago
+      return { label: 'Pagar hoy', class: 'due-today', icon: '🟡' };
+    } else if (dueDate - today <= 3 * 24 * 60 * 60 * 1000) {
+      // Próximos 3 días
+      const daysDiff = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
+      return { label: `Por vencer (${daysDiff} días)`, class: 'due-soon', icon: '🟡' };
     } else {
       return { label: 'Al día', class: 'current', icon: '🟢' };
     }
   };
 
   const filteredAndSortedLoans = useMemo(() => {
-    // Primero eliminar duplicados - mantener solo la entrada más reciente de cada solicitud
-    const uniqueLoans = [];
-    const seenRequestIds = new Set();
-    
-    // Procesar los préstamos del más reciente al más antiguo
-    const sortedByDate = [...loans].sort((a, b) => {
-      const aDate = new Date(a.approvedDate || a.requestDate || 0);
-      const bDate = new Date(b.approvedDate || b.requestDate || 0);
-      return bDate - aDate; // Más reciente primero
+    console.log('🔍 Debug - Todos los préstamos:', loans.length);
+    loans.forEach(loan => {
+      console.log(`📝 Préstamo ID:${loan.id}, RequestID:${loan.requestId}, Estado:"${loan.status}", Miembro:${loan.memberName}`);
     });
     
-    for (const loan of sortedByDate) {
-      const requestId = loan.requestId || loan.id;
-      
-      if (!seenRequestIds.has(requestId)) {
-        uniqueLoans.push(loan);
-        seenRequestIds.add(requestId);
+    // Solo mostrar préstamos que NO estén "Por aprobar"
+    let filtered = loans.filter(loan => {
+      // Excluir préstamos "Por aprobar"
+      if (loan.status === 'Por aprobar') {
+        return false;
       }
-    }
-    
-    console.log('🔄 Préstamos únicos después de filtrar duplicados:', uniqueLoans.length);
-    console.log('📋 Préstamos únicos:', uniqueLoans);
-    
-    // Luego aplicar filtros de búsqueda y estado
-    let filtered = uniqueLoans.filter(loan => {
+      
       const matchesSearch = loan.memberName.toLowerCase().includes(searchTerm.toLowerCase());
       
+      // Segunda condición: filtrar por estado de pago de préstamos aprobados
       let matchesStatus = true;
       if (statusFilter !== 'all') {
         const statusInfo = getStatusInfo(loan);
+        // Solo permitir estados de pago (no estados de solicitud)
         if (statusFilter === 'overdue' && statusInfo.class !== 'overdue') matchesStatus = false;
         if (statusFilter === 'current' && statusInfo.class !== 'current') matchesStatus = false;
         if (statusFilter === 'paid' && statusInfo.class !== 'paid') matchesStatus = false;
         if (statusFilter === 'due-soon' && statusInfo.class !== 'due-soon') matchesStatus = false;
-        if (statusFilter === 'pending-approval' && statusInfo.class !== 'pending-approval') matchesStatus = false;
-        if (statusFilter === 'approved' && statusInfo.class !== 'approved') matchesStatus = false;
-        if (statusFilter === 'rejected' && statusInfo.class !== 'rejected') matchesStatus = false;
+        // Remover filtros de estados de solicitud ya que solo mostramos aprobados
       }
       
       return matchesSearch && matchesStatus;
@@ -170,8 +220,8 @@ const LoansTable = ({ loans, setLoans, members, userRole, calculateLateFee, getP
     const seenRequestIds = new Set();
     
     const sortedByDate = [...loans].sort((a, b) => {
-      const aDate = new Date(a.approvedDate || a.requestDate || 0);
-      const bDate = new Date(b.approvedDate || b.requestDate || 0);
+      const aDate = new Date(a.approvedDate || a.rejectedDate || a.requestDate || 0);
+      const bDate = new Date(b.approvedDate || b.rejectedDate || b.requestDate || 0);
       return bDate - aDate;
     });
     
@@ -221,10 +271,7 @@ const LoansTable = ({ loans, setLoans, members, userRole, calculateLateFee, getP
             onChange={(e) => setStatusFilter(e.target.value)}
             className="status-filter"
           >
-            <option value="all">Todos los estados</option>
-            <option value="pending-approval">Por aprobar</option>
-            <option value="approved">Aprobada</option>
-            <option value="rejected">Rechazada</option>
+            <option value="all">Todos los préstamos</option>
             <option value="current">Al día</option>
             <option value="due-soon">Por vencer</option>
             <option value="overdue">Vencidos</option>
@@ -263,6 +310,11 @@ const LoansTable = ({ loans, setLoans, members, userRole, calculateLateFee, getP
           </thead>
           <tbody>
             {filteredAndSortedLoans.map((loan, index) => {
+              // Doble verificación: no renderizar préstamos "Por aprobar"
+              if (loan.status === 'Por aprobar') {
+                return null;
+              }
+              
               const statusInfo = getStatusInfo(loan);
               const progress = calculateProgress(loan);
               const weeklyPayment = loan.weeklyPayment || loan.monthlyPayment || 0;
@@ -272,6 +324,7 @@ const LoansTable = ({ loans, setLoans, members, userRole, calculateLateFee, getP
                   <td className="member-name">
                     <div className="member-info">
                       <span className="name">{loan.memberName}</span>
+                      <span className="status-id">{statusInfo.icon} ID: {loan.id}</span>
                     </div>
                   </td>
                   <td className="amount">
@@ -316,11 +369,26 @@ const LoansTable = ({ loans, setLoans, members, userRole, calculateLateFee, getP
                     )}
                   </td>
                   <td className="due-date">
-                    {new Date(loan.dueDate).toLocaleDateString('es-ES', {
-                      day: '2-digit',
-                      month: '2-digit',
-                      year: 'numeric'
-                    })}
+                    {(() => {
+                      // Si el préstamo tiene cronograma, mostrar la fecha del próximo pago
+                      let nextDueDate = loan.dueDate;
+                      if (loan.paymentSchedule && loan.paymentSchedule.length > 0) {
+                        const currentWeek = loan.currentWeek || loan.currentInstallment || 1;
+                        const nextPayment = loan.paymentSchedule.find(p => p.week === currentWeek);
+                        if (nextPayment) {
+                          nextDueDate = nextPayment.dueDate;
+                        }
+                      }
+                      
+                      // Manejar la fecha correctamente para evitar problemas de zona horaria
+                      const [year, month, day] = nextDueDate.split('-').map(Number);
+                      const dueDate = new Date(year, month - 1, day, 12, 0, 0); // Usar mediodía para evitar problemas
+                      return dueDate.toLocaleDateString('es-ES', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric'
+                      });
+                    })()}
                   </td>
                   <td className="status">
                     <span className={`status-badge ${statusInfo.class}`}>

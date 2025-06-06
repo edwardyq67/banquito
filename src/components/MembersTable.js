@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import './MembersTable.css';
 import SavingsPlan from './SavingsPlan';
 
-const MembersTable = ({ members, setMembers, settings, users, setUsers }) => {
+const MembersTable = ({ members, setMembers, settings, users, setUsers, darkMode }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [ratingFilter, setRatingFilter] = useState('all');
   const [sortConfig, setSortConfig] = useState({ key: 'name', direction: 'asc' });
@@ -311,7 +311,7 @@ const MembersTable = ({ members, setMembers, settings, users, setUsers }) => {
   const ratingCounts = getRatingCounts();
 
   return (
-    <div className="members-table-container">
+    <div className={`members-table-container ${darkMode ? 'dark' : ''}`}>
       <div className="members-header">
         <h2>👥 Gestión de Miembros</h2>
         <div className="members-summary">
